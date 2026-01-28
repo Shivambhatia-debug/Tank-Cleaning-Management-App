@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import api from '../../utils/api';
+import api from '@/utils/api';
 
 export default function LoginScreen() {
   const [phone, setPhone] = useState('');
