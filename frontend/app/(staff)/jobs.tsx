@@ -16,6 +16,7 @@ import api from '../../utils/api';
 
 export default function StaffJobsScreen() {
   const { user, logout } = useAuth();
+  const router = useRouter();
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
