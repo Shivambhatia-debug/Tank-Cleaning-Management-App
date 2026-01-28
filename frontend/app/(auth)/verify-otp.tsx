@@ -12,8 +12,8 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../../contexts/AuthContext';
-import api from '../../utils/api';
+import { useAuth } from '@/contexts/AuthContext';
+import api from '@/utils/api';
 
 export default function VerifyOTPScreen() {
   const [otp, setOtp] = useState('');
