@@ -69,7 +69,13 @@ export default function StaffJobsScreen() {
   };
 
   const renderJob = ({ item }: { item: any }) => (
-    <TouchableOpacity style={styles.jobCard}>
+    <TouchableOpacity 
+      style={styles.jobCard}
+      onPress={() => router.push({
+        pathname: '/(staff)/job-detail',
+        params: { jobId: item.id }
+      })}
+    >
       <View style={styles.jobHeader}>
         <Text style={styles.customerName}>{item.customer_name}</Text>
         <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
@@ -92,6 +98,9 @@ export default function StaffJobsScreen() {
           {item.notes}
         </Text>
       )}
+      <View style={styles.jobFooter}>
+        <Text style={styles.tapHint}>Tap to view details →</Text>
+      </View>
     </TouchableOpacity>
   );
 
