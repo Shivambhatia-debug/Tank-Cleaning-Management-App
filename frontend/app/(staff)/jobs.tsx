@@ -231,6 +231,18 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontStyle: 'italic',
   },
+  jobFooter: {
+    marginTop: 12,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+  },
+  tapHint: {
+    fontSize: 12,
+    color: '#007AFF',
+    textAlign: 'right',
+    fontWeight: '500',
+  },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
