@@ -10,7 +10,7 @@ import uuid
 
 # MongoDB connection
 MONGO_URL = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
-DB_NAME = os.environ.get('DB_NAME', 'tank_cleaning_db')
+DB_NAME = os.environ.get('DB_NAME', 'test_database')
 
 async def seed_demo_data():
     client = AsyncIOMotorClient(MONGO_URL)
