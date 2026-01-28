@@ -7,11 +7,15 @@ import {
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../utils/api';
+
+const { width } = Dimensions.get('window');
+const isSmallDevice = width < 375;
+const cardWidth = (width - 48) / 2;
 
 export default function DashboardScreen() {
   const { user, logout } = useAuth();
@@ -51,74 +55,110 @@ export default function DashboardScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Hello, {user?.name}</Text>
+        <View style={styles.headerContent}>
+          <Text style={styles.greeting} numberOfLines={1}>Hello, {user?.name}</Text>
           <Text style={styles.role}>Admin Dashboard</Text>
         </View>
         <TouchableOpacity onPress={logout} style={styles.logoutButton}>
-          <Ionicons name="log-out-outline" size={24} color="#FF3B30" />
+          <Text style={styles.logoutIcon}>🚪</Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView
         style={styles.content}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        <View style={styles.statsGrid}>
-          <View style={[styles.statCard, { backgroundColor: '#007AFF' }]}>
-            <Ionicons name="briefcase" size={32} color="#fff" />
-            <Text style={styles.statValue}>{stats?.total_jobs || 0}</Text>
-            <Text style={styles.statLabel}>Total Jobs</Text>
-          </View>
+        <View style={styles.statsContainer}>
+          <View style={styles.statsGrid}>
+            <View style={[styles.statCard, styles.primaryCard]}>
+              <View style={styles.statIcon}>
+                <Text style={styles.iconText}>💼</Text>
+              </View>
+              <View style={styles.statContent}>
+                <Text style={styles.statValue}>{stats?.total_jobs || 0}</Text>
+                <Text style={styles.statLabel}>Total Jobs</Text>
+              </View>
+            </View>
 
-          <View style={[styles.statCard, { backgroundColor: '#FF9500' }]}>
-            <Ionicons name="time" size={32} color="#fff" />
-            <Text style={styles.statValue}>{stats?.pending_jobs || 0}</Text>
-            <Text style={styles.statLabel}>Pending</Text>
-          </View>
+            <View style={[styles.statCard, styles.warningCard]}>
+              <View style={styles.statIcon}>
+                <Text style={styles.iconText}>⏳</Text>
+              </View>
+              <View style={styles.statContent}>
+                <Text style={styles.statValue}>{stats?.pending_jobs || 0}</Text>
+                <Text style={styles.statLabel}>Pending</Text>
+              </View>
+            </View>
 
-          <View style={[styles.statCard, { backgroundColor: '#34C759' }]}>
-            <Ionicons name="checkmark-circle" size={32} color="#fff" />
-            <Text style={styles.statValue}>{stats?.in_progress_jobs || 0}</Text>
-            <Text style={styles.statLabel}>In Progress</Text>
-          </View>
+            <View style={[styles.statCard, styles.successCard]}>
+              <View style={styles.statIcon}>
+                <Text style={styles.iconText}>🔄</Text>
+              </View>
+              <View style={styles.statContent}>
+                <Text style={styles.statValue}>{stats?.in_progress_jobs || 0}</Text>
+                <Text style={styles.statLabel}>In Progress</Text>
+              </View>
+            </View>
 
-          <View style={[styles.statCard, { backgroundColor: '#5856D6' }]}>
-            <Ionicons name="people" size={32} color="#fff" />
-            <Text style={styles.statValue}>{stats?.total_staff || 0}</Text>
-            <Text style={styles.statLabel}>Active Staff</Text>
+            <View style={[styles.statCard, styles.infoCard]}>
+              <View style={styles.statIcon}>
+                <Text style={styles.iconText}>👷</Text>
+              </View>
+              <View style={styles.statContent}>
+                <Text style={styles.statValue}>{stats?.total_staff || 0}</Text>
+                <Text style={styles.statLabel}>Active Staff</Text>
+              </View>
+            </View>
           </View>
         </View>
 
-        <View style={styles.quickActions}>
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           
-          <TouchableOpacity style={styles.actionButton}>
-            <View style={styles.actionIcon}>
-              <Ionicons name="add-circle" size={24} color="#007AFF" />
+          <TouchableOpacity style={styles.actionCard}>
+            <View style={styles.actionLeft}>
+              <View style={[styles.actionIcon, { backgroundColor: '#E3F2FD' }]}>
+                <Text style={styles.actionIconText}>➕</Text>
+              </View>
+              <View style={styles.actionContent}>
+                <Text style={styles.actionTitle}>Create Job</Text>
+                <Text style={styles.actionSubtitle}>Add new tank cleaning task</Text>
+              </View>
             </View>
-            <Text style={styles.actionText}>Create New Job</Text>
-            <Ionicons name="chevron-forward" size={20} color="#8E8E93" />
+            <Text style={styles.actionArrow}>›</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionButton}>
-            <View style={styles.actionIcon}>
-              <Ionicons name="person-add" size={24} color="#34C759" />
+          <TouchableOpacity style={styles.actionCard}>
+            <View style={styles.actionLeft}>
+              <View style={[styles.actionIcon, { backgroundColor: '#E8F5E9' }]}>
+                <Text style={styles.actionIconText}>👤</Text>
+              </View>
+              <View style={styles.actionContent}>
+                <Text style={styles.actionTitle}>Add Staff</Text>
+                <Text style={styles.actionSubtitle}>Onboard new team member</Text>
+              </View>
             </View>
-            <Text style={styles.actionText}>Add Staff Member</Text>
-            <Ionicons name="chevron-forward" size={20} color="#8E8E93" />
+            <Text style={styles.actionArrow}>›</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionButton}>
-            <View style={styles.actionIcon}>
-              <Ionicons name="location" size={24} color="#FF3B30" />
+          <TouchableOpacity style={styles.actionCard}>
+            <View style={styles.actionLeft}>
+              <View style={[styles.actionIcon, { backgroundColor: '#FFEBEE' }]}>
+                <Text style={styles.actionIconText}>🗺️</Text>
+              </View>
+              <View style={styles.actionContent}>
+                <Text style={styles.actionTitle}>Live Tracking</Text>
+                <Text style={styles.actionSubtitle}>Monitor active jobs</Text>
+              </View>
             </View>
-            <Text style={styles.actionText}>View Live Tracking</Text>
-            <Ionicons name="chevron-forward" size={20} color="#8E8E93" />
+            <Text style={styles.actionArrow}>›</Text>
           </TouchableOpacity>
         </View>
+
+        <View style={{ height: 20 }} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -138,53 +178,101 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5EA',
   },
+  headerContent: {
+    flex: 1,
+    marginRight: 12,
+  },
   greeting: {
-    fontSize: 24,
+    fontSize: isSmallDevice ? 20 : 24,
     fontWeight: 'bold',
     color: '#333',
   },
   role: {
-    fontSize: 14,
+    fontSize: isSmallDevice ? 12 : 14,
     color: '#8E8E93',
     marginTop: 4,
   },
   logoutButton: {
-    padding: 8,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F5F5F5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logoutIcon: {
+    fontSize: 20,
   },
   content: {
     flex: 1,
   },
+  statsContainer: {
+    padding: 16,
+  },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    padding: 16,
-    gap: 16,
+    gap: 12,
   },
   statCard: {
-    width: '47%',
-    padding: 20,
-    borderRadius: 16,
+    width: cardWidth,
+    flexDirection: 'row',
     alignItems: 'center',
+    padding: 16,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  primaryCard: {
+    backgroundColor: '#007AFF',
+  },
+  warningCard: {
+    backgroundColor: '#FF9500',
+  },
+  successCard: {
+    backgroundColor: '#34C759',
+  },
+  infoCard: {
+    backgroundColor: '#5856D6',
+  },
+  statIcon: {
+    width: isSmallDevice ? 40 : 48,
+    height: isSmallDevice ? 40 : 48,
+    borderRadius: isSmallDevice ? 20 : 24,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  iconText: {
+    fontSize: isSmallDevice ? 20 : 24,
+  },
+  statContent: {
+    flex: 1,
   },
   statValue: {
-    fontSize: 32,
+    fontSize: isSmallDevice ? 24 : 28,
     fontWeight: 'bold',
     color: '#fff',
-    marginTop: 12,
   },
   statLabel: {
-    fontSize: 14,
+    fontSize: isSmallDevice ? 11 : 12,
     color: '#fff',
-    marginTop: 4,
+    marginTop: 2,
     opacity: 0.9,
   },
-  quickActions: {
-    padding: 20,
+  section: {
+    padding: 16,
+    paddingTop: 0,
   },
   sectionTitle: {
     fontSize: 20,
@@ -192,27 +280,52 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 16,
   },
-  actionButton: {
+  actionCard: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: '#fff',
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  actionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
   },
   actionIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F5F5F5',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
   },
-  actionText: {
+  actionIconText: {
+    fontSize: 24,
+  },
+  actionContent: {
     flex: 1,
+  },
+  actionTitle: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
     color: '#333',
+    marginBottom: 2,
+  },
+  actionSubtitle: {
+    fontSize: 13,
+    color: '#8E8E93',
+  },
+  actionArrow: {
+    fontSize: 24,
+    color: '#C7C7CC',
+    fontWeight: '300',
   },
 });
