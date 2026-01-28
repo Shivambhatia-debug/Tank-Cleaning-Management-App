@@ -1,22 +1,44 @@
 {
   "expo": {
-    "name": "frontend",
-    "slug": "frontend",
+    "name": "Tank Cleaning App",
+    "slug": "tank-cleaning-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "frontend",
+    "scheme": "tankcleaning",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tankcleaning.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Take photos of tank before and after cleaning",
+        "NSPhotoLibraryUsageDescription": "Select photos from your library",
+        "NSLocationWhenInUseUsageDescription": "Track location during active jobs",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Track your location during jobs",
+        "NSLocationAlwaysUsageDescription": "Track location in background"
+      }
     },
     "android": {
+      "package": "com.tankcleaning.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#000"
+        "backgroundColor": "#007AFF"
       },
-      "edgeToEdgeEnabled": true
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ],
+      "edgeToEdgeEnabled": true,
+      "config": {
+        "googleMaps": {
+          "apiKey": "YOUR_GOOGLE_MAPS_API_KEY"
+        }
+      }
     },
     "web": {
       "bundler": "metro",
@@ -31,7 +53,30 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#000"
+          "backgroundColor": "#007AFF"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Tank Cleaning App to track your location during active jobs.",
+          "locationAlwaysPermission": "Allow Tank Cleaning App to track your location in the background.",
+          "locationWhenInUsePermission": "Allow Tank Cleaning App to use your location.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Tank Cleaning App to access your camera to take before and after photos."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Tank Cleaning App to access your photos."
         }
       ]
     ],
