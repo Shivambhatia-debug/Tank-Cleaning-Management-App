@@ -105,16 +105,29 @@ class JobUpdate(BaseModel):
 async def request_otp(request: OTPRequest):
     """Generate and store OTP for phone number"""
     try:
-        # Generate 6-digit OTP
-        otp = str(random.randint(100000, 999999))
+        # Demo users with fixed OTP for testing
+        demo_users = [
+            "+919876543210",  # Admin
+            "+919876543211",  # Staff 1
+            "+919876543212",  # Staff 2
+            "+919876543213"   # Staff 3
+        ]
         
-        # Store OTP in database with expiration (5 minutes)
+        # Use fixed OTP for demo users, random for others
+        if request.phone in demo_users:
+            otp = "123456"
+            expires_at = datetime.utcnow() + timedelta(days=365)  # Long expiry for demo
+        else:
+            otp = str(random.randint(100000, 999999))
+            expires_at = datetime.utcnow() + timedelta(minutes=5)
+        
+        # Store OTP in database
         await db.otps.update_one(
             {"phone": request.phone},
             {
                 "$set": {
                     "otp": otp,
-                    "expires_at": datetime.utcnow() + timedelta(minutes=5),
+                    "expires_at": expires_at,
                     "created_at": datetime.utcnow()
                 }
             },
