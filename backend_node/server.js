@@ -12,13 +12,14 @@ const Job = require('./models/Job');
 const Location = require('./models/Location');
 
 const app = express();
-const server = http.createServer(app);
-const io = socketIo(server, {
-    cors: {
-        origin: "*",
-        methods: ["GET", "POST"]
-    }
-});
+// On Vercel (serverless) we don't create HTTP server or Socket.io - they cause crash
+let server, io;
+if (!process.env.VERCEL) {
+    server = http.createServer(app);
+    io = socketIo(server, {
+        cors: { origin: "*", methods: ["GET", "POST"] }
+    });
+}
 
 const fs = require('fs');
 const path = require('path');
@@ -27,12 +28,12 @@ const multer = require('multer');
 app.use(cors());
 app.use(express.json());
 
-// Uploads Config
-const uploadDir = 'uploads';
-if (!fs.existsSync(uploadDir)) {
+// Uploads Config (Vercel: /tmp only; local: uploads/)
+const uploadDir = process.env.VERCEL ? '/tmp' : 'uploads';
+if (!process.env.VERCEL && !fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir);
 }
-app.use('/uploads', express.static('uploads'));
+app.use('/uploads', express.static(uploadDir));
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -45,30 +46,38 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// Database Connection
-mongoose.connect(process.env.MONGO_URI)
-    .then(() => console.log('✅ MongoDB connected'))
-    .catch(err => console.error('❌ MongoDB connection error:', err));
+// Database Connection (skip on Vercel if MONGO_URI missing to avoid crash)
+if (process.env.MONGO_URI) {
+    mongoose.connect(process.env.MONGO_URI)
+        .then(() => {
+            console.log('✅ MongoDB connected');
+            seedAdmin();
+        })
+        .catch(err => console.error('❌ MongoDB connection error:', err));
+} else if (!process.env.VERCEL) {
+    console.warn('⚠️ MONGO_URI not set');
+}
 
 // Admin Seeder
-const seedAdmin = async () => {
-    try {
-        const adminExists = await User.findOne({ role: 'admin' });
-        if (!adminExists) {
-            const admin = new User({
-                phone: '9319329339',
-                password: 'admin123', // Initial password
-                name: 'Super Admin',
-                role: 'admin'
-            });
-            await admin.save();
-            console.log('✅ Admin user created: 9319329339 / admin123');
+function seedAdmin() {
+    return (async () => {
+        try {
+            const adminExists = await User.findOne({ role: 'admin' });
+            if (!adminExists) {
+                const admin = new User({
+                    phone: '9319329339',
+                    password: 'admin123',
+                    name: 'Super Admin',
+                    role: 'admin'
+                });
+                await admin.save();
+                console.log('✅ Admin user created: 9319329339 / admin123');
+            }
+        } catch (error) {
+            console.error('Seeder error:', error);
         }
-    } catch (error) {
-        console.error('Seeder error:', error);
-    }
-};
-seedAdmin();
+    })();
+}
 
 // Middleware
 const auth = (req, res, next) => {
@@ -232,8 +241,7 @@ app.put('/api/jobs/:id', auth, async (req, res) => {
 
         const job = await Job.findByIdAndUpdate(req.params.id, updates, { new: true });
 
-        // Notify room
-        io.to(`job_${req.params.id}`).emit('job_updated', job);
+        if (io) io.to(`job_${req.params.id}`).emit('job_updated', job);
 
         res.json({ success: true, message: 'Job updated' });
     } catch (err) {
@@ -308,12 +316,11 @@ app.post('/api/location/update', async (req, res) => {
         }, { new: true });
         console.log(`💾 Saved last location for staff ${staffId}: ${latitude}, ${longitude}`, updatedUser ? 'SUCCESS' : 'USER NOT FOUND');
 
-        // Broadcast via Socket.IO
         const ioData = { staffId, latitude, longitude, jobId };
-        if (jobId) {
-            io.to(`job_${jobId}`).emit('location_update', ioData);
+        if (io) {
+            if (jobId) io.to(`job_${jobId}`).emit('location_update', ioData);
+            io.emit('staff_location_update', ioData);
         }
-        io.emit('staff_location_update', ioData);
 
         res.json({ success: true });
     } catch (err) {
@@ -322,9 +329,8 @@ app.post('/api/location/update', async (req, res) => {
     }
 });
 
-// --- SOCKET.IO TRACKING ---
-
-io.on('connection', (socket) => {
+// --- SOCKET.IO TRACKING (skip on Vercel - no persistent connections) ---
+if (io) io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
 
     socket.on('join_job', (jobId) => {
@@ -393,7 +399,13 @@ app.get('/api/stats/dashboard', auth, async (req, res) => {
 
 const PORT = process.env.PORT || 8002;
 const HOST = '0.0.0.0'; // allow connections from emulator/device on same network
-server.listen(PORT, HOST, () => {
-    console.log(`🚀 Node.js Server running on http://${HOST}:${PORT}`);
-    console.log('   Upload route: POST /api/jobs/:id/upload');
-});
+
+// On Vercel we export the app only; no listen (serverless)
+if (!process.env.VERCEL) {
+    server.listen(PORT, HOST, () => {
+        console.log(`🚀 Node.js Server running on http://${HOST}:${PORT}`);
+        console.log('   Upload route: POST /api/jobs/:id/upload');
+    });
+}
+
+module.exports = app;
