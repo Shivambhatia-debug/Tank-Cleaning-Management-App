@@ -1,10 +1,6 @@
 # 🎉 Tank Cleaning App - Complete Testing Ready!
 
-## ✅ **FIXED ISSUES:**
-- ✅ OTP ab fixed hai (123456) demo users ke liye
-- ✅ Admin properly dashboard pe redirect hota hai
-- ✅ Staff properly jobs list pe redirect hota hai
-- ✅ Sab features complete ho gaye hain
+**Backend:** Sirf **Node.js** (backend_node) use ho raha hai. Python backend remove kar diya gaya hai.
 
 ---
 
@@ -12,10 +8,12 @@
 
 ### 👨‍💼 **ADMIN LOGIN** (Dashboard Access)
 
+Node backend seed admin (server start pe auto-create hota hai):
+
 ```
-📞 Phone: +919876543210
-🔐 OTP: 123456 (FIXED)
-👤 Name: Admin Kumar
+📞 Phone: 9319329339
+🔐 Password: admin123
+👤 Name: Super Admin
 ```
 
 **Admin Features:**
@@ -29,45 +27,20 @@
 
 ### 👷 **STAFF LOGINS** (Job List Access)
 
-#### Staff 1: Rajesh Singh
-```
-📞 Phone: +919876543211
-🔐 OTP: 123456 (FIXED)
-```
-**Assigned Jobs:**
-- Sharma Residency (Pending)
-- Green Valley Apartments (In Progress)
+Staff ko Admin "Add Staff" se create karta hai (name, phone, password). Uske baad staff wahi phone + password se login karke jobs dekh sakta hai.
 
----
-
-#### Staff 2: Priya Sharma
-```
-📞 Phone: +919876543212
-🔐 OTP: 123456 (FIXED)
-```
-**Assigned Jobs:**
-- Green Valley Apartments (In Progress)
-- Tech Park Complex (Completed)
-
----
-
-#### Staff 3: Amit Patel
-```
-📞 Phone: +919876543213
-🔐 OTP: 123456 (FIXED)
-```
-**Assigned Jobs:**
-- Sunrise Villa (Pending)
-- Metro Mall (In Progress)
+**Example:** Agar admin ne staff add kiya:
+- Phone: 9876543210, Password: staff123  
+Toh staff login: Phone `9876543210`, Password `staff123`
 
 ---
 
 ## 🎯 **COMPLETE FEATURES LIST**
 
 ### ✅ **Authentication System:**
-- Phone number input
-- Fixed OTP (123456) for demo users
-- Random OTP for other numbers
+- Phone + Password login (Node backend)
+- Admin: seed 9319329339 / admin123
+- Staff: admin se create, phir phone + password se login
 - Role-based automatic routing
 - Persistent login sessions
 
@@ -123,8 +96,8 @@
 ### Step 1: Admin Testing
 
 1. **Login**
-   - Phone: `+919876543210`
-   - OTP: `123456`
+   - Phone: `9319329339`
+   - Password: `admin123`
    - ✅ Should redirect to Dashboard
 
 2. **Dashboard Tab**
@@ -166,9 +139,8 @@
 
 ### Step 2: Staff Testing
 
-1. **Login as Staff 1**
-   - Phone: `+919876543211`
-   - OTP: `123456`
+1. **Login as Staff**
+   - Phone aur password jo admin ne "Add Staff" me set kiya
    - ✅ Should redirect to Jobs List
 
 2. **View Jobs**
@@ -229,7 +201,7 @@
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Phone OTP Login | ✅ Working | Fixed OTP: 123456 |
+| Phone + Password Login | ✅ Working | Admin: 9319329339 / admin123 |
 | Role Detection | ✅ Working | Admin/Staff auto-routing |
 | Admin Dashboard | ✅ Working | Real-time stats |
 | Staff Management | ✅ Working | CRUD operations |

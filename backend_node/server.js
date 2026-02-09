@@ -1,0 +1,399 @@
+require('dotenv').config();
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+const http = require('http');
+const socketIo = require('socket.io');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+
+const User = require('./models/User');
+const Job = require('./models/Job');
+const Location = require('./models/Location');
+
+const app = express();
+const server = http.createServer(app);
+const io = socketIo(server, {
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"]
+    }
+});
+
+const fs = require('fs');
+const path = require('path');
+const multer = require('multer');
+
+app.use(cors());
+app.use(express.json());
+
+// Uploads Config
+const uploadDir = 'uploads';
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir);
+}
+app.use('/uploads', express.static('uploads'));
+
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, 'photo-' + uniqueSuffix + path.extname(file.originalname));
+    }
+});
+const upload = multer({ storage: storage });
+
+// Database Connection
+mongoose.connect(process.env.MONGO_URI)
+    .then(() => console.log('✅ MongoDB connected'))
+    .catch(err => console.error('❌ MongoDB connection error:', err));
+
+// Admin Seeder
+const seedAdmin = async () => {
+    try {
+        const adminExists = await User.findOne({ role: 'admin' });
+        if (!adminExists) {
+            const admin = new User({
+                phone: '9319329339',
+                password: 'admin123', // Initial password
+                name: 'Super Admin',
+                role: 'admin'
+            });
+            await admin.save();
+            console.log('✅ Admin user created: 9319329339 / admin123');
+        }
+    } catch (error) {
+        console.error('Seeder error:', error);
+    }
+};
+seedAdmin();
+
+// Middleware
+const auth = (req, res, next) => {
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    if (!token) return res.status(401).json({ message: 'Access denied' });
+
+    try {
+        const verified = jwt.verify(token, process.env.JWT_SECRET);
+        req.user = verified;
+        next();
+    } catch (err) {
+        res.status(400).json({ message: 'Invalid token' });
+    }
+};
+
+// --- AUTH ROUTES ---
+
+app.post('/api/auth/login', async (req, res) => {
+    try {
+        const { phone, password } = req.body;
+        const user = await User.findOne({ phone });
+        if (!user) return res.status(400).json({ message: 'User not found' });
+
+        const validPass = await user.comparePassword(password);
+        if (!validPass) return res.status(400).json({ message: 'Invalid password' });
+
+        const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET);
+        res.json({
+            token,
+            user: { id: user._id, name: user.name, phone: user.phone, role: user.role }
+        });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+app.post('/api/users/staff', auth, async (req, res) => {
+    if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
+    try {
+        const { phone, password, name, businessName, location } = req.body;
+        const existing = await User.findOne({ phone: String(phone).replace(/\D/g, '').slice(0, 10) });
+        if (existing) return res.status(400).json({ message: 'Phone already exists' });
+
+        const staff = new User({
+            phone: String(phone).replace(/\D/g, '').slice(0, 10),
+            password,
+            name,
+            role: 'staff',
+            businessName: businessName || '',
+            location: location || '',
+            plainPasswordForAdmin: password || ''
+        });
+        await staff.save();
+        res.status(201).json({ message: 'Staff created successfully' });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+app.get('/api/users', auth, async (req, res) => {
+    try {
+        const users = await User.find({ role: 'staff' }).select('-password');
+        res.json(users);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+app.put('/api/users/:id', auth, async (req, res) => {
+    if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
+    try {
+        const { isActive, name } = req.body;
+        const updates = {};
+        if (typeof isActive === 'boolean') updates.isActive = isActive;
+        if (name) updates.name = name;
+        const user = await User.findByIdAndUpdate(req.params.id, updates, { new: true }).select('-password');
+        if (!user) return res.status(404).json({ message: 'User not found' });
+        res.json(user);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+app.delete('/api/users/:id', auth, async (req, res) => {
+    if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
+    try {
+        const user = await User.findById(req.params.id);
+        if (!user) return res.status(404).json({ message: 'User not found' });
+        if (user.role === 'admin') return res.status(400).json({ message: 'Cannot delete admin' });
+        await User.findByIdAndDelete(req.params.id);
+        res.json({ success: true, message: 'Staff deleted' });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// --- JOB ROUTES ---
+
+app.post('/api/jobs', auth, async (req, res) => {
+    if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
+    try {
+        const job = new Job(req.body);
+        await job.save();
+        // Ek staff ek hi job par: in staff ko doosri sab pending/in_progress jobs se hatao
+        const staffIds = (job.assignedStaff || []).map(id => id.toString ? id.toString() : id);
+        if (staffIds.length > 0) {
+            await Job.updateMany(
+                { _id: { $ne: job._id }, status: { $in: ['pending', 'in_progress'] } },
+                { $pullAll: { assignedStaff: staffIds } }
+            );
+        }
+        res.status(201).json({ success: true, jobId: job._id });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+app.get('/api/jobs', auth, async (req, res) => {
+    try {
+        const filter = {};
+        if (req.query.status) filter.status = req.query.status;
+        if (req.query.staffId) filter.assignedStaff = req.query.staffId;
+
+        // If staff, only show assigned jobs
+        if (req.user.role === 'staff') {
+            filter.assignedStaff = req.user.id;
+        }
+
+        const jobs = await Job.find(filter).populate('assignedStaff', 'name phone lastLatitude lastLongitude lastLocationTime').sort({ 'timeline.createdAt': -1 });
+        // Ensure each job has string "id" for client (delete etc.)
+        const list = jobs.map(j => {
+            const o = j.toObject ? j.toObject() : j;
+            o.id = (o._id && o._id.toString) ? o._id.toString() : String(o._id || o.id || '');
+            return o;
+        });
+        res.json(list);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+app.get('/api/jobs/:id', auth, async (req, res) => {
+    try {
+        const job = await Job.findById(req.params.id).populate('assignedStaff', 'name phone lastLatitude lastLongitude lastLocationTime');
+        if (!job) return res.status(404).json({ message: 'Job not found' });
+        res.json(job);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+app.put('/api/jobs/:id', auth, async (req, res) => {
+    try {
+        const { status, notes } = req.body;
+        const updates = {};
+        if (status) updates.status = status;
+        if (notes) updates.notes = notes;
+
+        if (status === 'in_progress') updates['timeline.startedAt'] = new Date();
+        if (status === 'completed') updates['timeline.completedAt'] = new Date();
+
+        const job = await Job.findByIdAndUpdate(req.params.id, updates, { new: true });
+
+        // Notify room
+        io.to(`job_${req.params.id}`).emit('job_updated', job);
+
+        res.json({ success: true, message: 'Job updated' });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// --- DELETE JOB (Admin only) ---
+app.delete('/api/jobs/:id', auth, async (req, res) => {
+    if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
+    const id = (req.params.id || '').trim();
+    if (!id) return res.status(400).json({ message: 'Job id required' });
+    if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ message: 'Invalid job id' });
+    try {
+        const job = await Job.findByIdAndDelete(id);
+        if (!job) return res.status(404).json({ message: 'Job not found. It may have been deleted already.' });
+        res.json({ success: true, message: 'Job deleted' });
+    } catch (err) {
+        if (err.name === 'CastError') return res.status(400).json({ message: 'Invalid job id' });
+        res.status(500).json({ message: err.message || 'Failed to delete job' });
+    }
+});
+
+// --- JOB PHOTO UPLOAD (Staff completion photo + time, date, location) ---
+app.post('/api/jobs/:id/upload', auth, upload.single('photo'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
+        const timestamp = req.body.timestamp ? new Date(req.body.timestamp) : new Date();
+        const lat = req.body.latitude != null ? parseFloat(req.body.latitude) : null;
+        const lng = req.body.longitude != null ? parseFloat(req.body.longitude) : null;
+        const updates = {
+            completionPhoto: req.file.filename,
+            completionPhotoAt: timestamp,
+            completionLatitude: lat,
+            completionLongitude: lng,
+            $push: { 'photos.after': '/uploads/' + req.file.filename }
+        };
+        const job = await Job.findByIdAndUpdate(req.params.id, updates, { new: true });
+        if (!job) return res.status(404).json({ message: 'Job not found' });
+        res.json({
+            success: true,
+            message: 'Photo uploaded',
+            completionPhoto: job.completionPhoto,
+            completionPhotoAt: job.completionPhotoAt,
+            completionLatitude: job.completionLatitude,
+            completionLongitude: job.completionLongitude
+        });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// --- REST LOCATION UPDATE (For Background Tasks) ---
+app.post('/api/location/update', async (req, res) => {
+    try {
+        const { staffId, latitude, longitude, jobId } = req.body;
+
+        // Save to DB
+        const locationData = {
+            staffId,
+            latitude,
+            longitude
+        };
+        if (jobId) locationData.jobId = jobId;
+        await Location.create(locationData);
+
+        // Update User's last location
+        const updatedUser = await User.findByIdAndUpdate(staffId, {
+            lastLatitude: latitude,
+            lastLongitude: longitude,
+            lastLocationTime: new Date()
+        }, { new: true });
+        console.log(`💾 Saved last location for staff ${staffId}: ${latitude}, ${longitude}`, updatedUser ? 'SUCCESS' : 'USER NOT FOUND');
+
+        // Broadcast via Socket.IO
+        const ioData = { staffId, latitude, longitude, jobId };
+        if (jobId) {
+            io.to(`job_${jobId}`).emit('location_update', ioData);
+        }
+        io.emit('staff_location_update', ioData);
+
+        res.json({ success: true });
+    } catch (err) {
+        console.error('REST Location error:', err);
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// --- SOCKET.IO TRACKING ---
+
+io.on('connection', (socket) => {
+    console.log('Client connected:', socket.id);
+
+    socket.on('join_job', (jobId) => {
+        socket.join(`job_${jobId}`);
+    });
+
+    socket.on('update_location', async (data) => {
+        // ... (Keep existing socket logic for backward compatibility or foreground)
+        try {
+            const locationData = {
+                staffId: data.staffId,
+                latitude: data.latitude,
+                longitude: data.longitude
+            };
+            if (data.jobId) locationData.jobId = data.jobId;
+
+            await Location.create(locationData);
+
+            // Update User's last location
+            await User.findByIdAndUpdate(data.staffId, {
+                lastLatitude: data.latitude,
+                lastLongitude: data.longitude,
+                lastLocationTime: new Date()
+            });
+
+            if (data.jobId) {
+                io.to(`job_${data.jobId}`).emit('location_update', data);
+            }
+            io.emit('staff_location_update', data);
+        } catch (err) {
+            console.error('Tracking error:', err);
+        }
+    });
+
+    socket.on('disconnect', () => {
+        console.log('Client disconnected');
+    });
+});
+
+// --- HEALTH (no auth - for connectivity check) ---
+app.get('/api/health', (req, res) => {
+    res.json({ ok: true, message: 'Backend is running', uploadRoute: 'POST /api/jobs/:id/upload' });
+});
+
+// --- STATS ROUTES ---
+
+app.get('/api/stats/dashboard', auth, async (req, res) => {
+    try {
+        const totalJobs = await Job.countDocuments();
+        const pendingJobs = await Job.countDocuments({ status: 'pending' });
+        const inProgressJobs = await Job.countDocuments({ status: 'in_progress' });
+        const completedJobs = await Job.countDocuments({ status: 'completed' });
+        const activeStaff = await User.countDocuments({ role: 'staff', isActive: true });
+
+        res.json({
+            totalJobs,
+            pendingJobs,
+            inProgressJobs,
+            completedJobs,
+            activeStaff
+        });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+const PORT = process.env.PORT || 8002;
+const HOST = '0.0.0.0'; // allow connections from emulator/device on same network
+server.listen(PORT, HOST, () => {
+    console.log(`🚀 Node.js Server running on http://${HOST}:${PORT}`);
+    console.log('   Upload route: POST /api/jobs/:id/upload');
+});

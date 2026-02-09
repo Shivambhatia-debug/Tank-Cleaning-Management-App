@@ -6,14 +6,16 @@ export default function AdminLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#007AFF',
-        tabBarInactiveTintColor: '#8E8E93',
+        tabBarActiveTintColor: '#0EA5E9',
+        tabBarInactiveTintColor: '#94A3B8',
         tabBarStyle: {
-          borderTopColor: '#E5E5EA',
+          borderTopColor: '#E8E8ED',
           paddingBottom: 8,
           paddingTop: 8,
           height: 60,
+          backgroundColor: '#fff',
         },
+        tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
       }}
     >
       <Tabs.Screen

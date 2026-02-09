@@ -12,39 +12,44 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import api from '../../utils/api';
+import { useAuth } from '../../contexts/AuthContext';
+import BrandText from '../../components/BrandText';
 
 export default function LoginScreen() {
   const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const { login } = useAuth();
 
-  const handleSendOTP = async () => {
-    if (!phone || phone.length < 10) {
-      Alert.alert('Invalid Phone', 'Please enter a valid phone number');
+  const handleLogin = async () => {
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length !== 10) {
+      Alert.alert('Invalid Phone', 'Enter exactly 10 digit phone number');
+      return;
+    }
+    if (!password) {
+      Alert.alert('Missing Password', 'Please enter your password');
       return;
     }
 
     setLoading(true);
     try {
-      const response = await api.post('/auth/request-otp', { phone });
-      
-      if (response.data.success) {
-        Alert.alert(
-          'OTP Sent',
-          `OTP: ${response.data.otp}\n(For demo purposes only)`,
-          [
-            {
-              text: 'OK',
-              onPress: () => router.push({
-                pathname: '/(auth)/verify-otp',
-                params: { phone }
-              })
-            }
-          ]
-        );
+      const response = await api.post('/auth/login', { phone: digits, password });
+
+      const { user, token } = response.data;
+      await login(user, token);
+
+      // Navigation is handled by auth state change in index.tsx or layout
+      if (user.role === 'admin') {
+        router.replace('/(admin)/dashboard');
+      } else {
+        router.replace('/(staff)/jobs');
       }
+
     } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.detail || 'Failed to send OTP');
+      const message = error.response?.data?.message || 'Login failed';
+      Alert.alert('Error', message);
     } finally {
       setLoading(false);
     }
@@ -57,9 +62,7 @@ export default function LoginScreen() {
     >
       <View style={styles.content}>
         <View style={styles.header}>
-          <Text style={styles.icon}>💧</Text>
-          <Text style={styles.title}>Tank Cleaning</Text>
-          <Text style={styles.subtitle}>Management System</Text>
+          <BrandText />
         </View>
 
         <View style={styles.form}>
@@ -68,29 +71,43 @@ export default function LoginScreen() {
             <Text style={styles.inputIcon}>📞</Text>
             <TextInput
               style={styles.input}
-              placeholder="Enter your phone number"
+              placeholder="10 digit phone number"
               value={phone}
-              onChangeText={setPhone}
+              onChangeText={(t) => setPhone(t.replace(/\D/g, '').slice(0, 10))}
               keyboardType="phone-pad"
-              maxLength={15}
+              maxLength={10}
+              editable={!loading}
+            />
+          </View>
+
+          <Text style={styles.label}>Password</Text>
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputIcon}>🔒</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter your password"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
               editable={!loading}
             />
           </View>
 
           <TouchableOpacity
             style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleSendOTP}
+            onPress={handleLogin}
             disabled={loading}
+            activeOpacity={0.85}
           >
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.buttonText}>Send OTP</Text>
+              <Text style={styles.buttonText}>Sign In</Text>
             )}
           </TouchableOpacity>
 
           <Text style={styles.infoText}>
-            You will receive a 6-digit OTP to verify your phone number
+            Admin: Use provided credentials · Staff: Contact admin for login
           </Text>
         </View>
       </View>
@@ -101,73 +118,63 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#F0F4F8',
   },
   content: {
     flex: 1,
-    padding: 24,
+    padding: 20,
     justifyContent: 'center',
   },
   header: {
     alignItems: 'center',
-    marginBottom: 48,
-  },
-  icon: {
-    fontSize: 64,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#333',
-    marginTop: 16,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    marginTop: 8,
+    marginBottom: 28,
   },
   form: {
     backgroundColor: '#fff',
     borderRadius: 16,
-    padding: 24,
+    padding: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
     elevation: 4,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
+    color: '#374151',
     marginBottom: 8,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#DDD',
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
     borderRadius: 12,
     paddingHorizontal: 16,
-    marginBottom: 24,
+    marginBottom: 20,
+    backgroundColor: '#F9FAFB',
   },
   inputIcon: {
     marginRight: 12,
-    fontSize: 20,
+    fontSize: 18,
   },
   input: {
     flex: 1,
     height: 48,
     fontSize: 16,
-    color: '#333',
+    color: '#1F2937',
   },
   button: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#0EA5E9',
     borderRadius: 12,
     height: 52,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
+    marginTop: 4,
   },
   buttonDisabled: {
     opacity: 0.6,
@@ -179,8 +186,9 @@ const styles = StyleSheet.create({
   },
   infoText: {
     fontSize: 12,
-    color: '#666',
+    color: '#6B7280',
     textAlign: 'center',
     lineHeight: 18,
   },
 });
+

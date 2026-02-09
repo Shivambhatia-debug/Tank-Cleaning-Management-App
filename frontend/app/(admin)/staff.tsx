@@ -13,13 +13,16 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import api from '../../utils/api';
+import BrandText from '../../components/BrandText';
 
 export default function StaffManagementScreen() {
   const [staff, setStaff] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
-  const [newStaff, setNewStaff] = useState({ name: '', phone: '' });
+  const [detailModalVisible, setDetailModalVisible] = useState(false);
+  const [selectedStaff, setSelectedStaff] = useState<any>(null);
+  const [newStaff, setNewStaff] = useState({ name: '', phone: '', password: '', businessName: '', location: '' });
   const [addingStaff, setAddingStaff] = useState(false);
 
   useEffect(() => {
@@ -40,26 +43,33 @@ export default function StaffManagementScreen() {
   };
 
   const handleAddStaff = async () => {
-    if (!newStaff.name || !newStaff.phone) {
+    if (!newStaff.name || !newStaff.phone || !newStaff.password) {
       Alert.alert('Error', 'Please fill all fields');
       return;
     }
 
-    if (newStaff.phone.length < 10) {
-      Alert.alert('Error', 'Please enter valid phone number');
+    const phoneDigits = newStaff.phone.replace(/\D/g, '');
+    if (phoneDigits.length !== 10) {
+      Alert.alert('Error', 'Enter exactly 10 digit phone number');
       return;
     }
 
     setAddingStaff(true);
     try {
-      await api.post('/users/create-staff', {
+      await api.post('/users/staff', {
         name: newStaff.name,
-        phone: newStaff.phone,
+        phone: phoneDigits,
+        password: newStaff.password,
         role: 'staff',
+        businessName: newStaff.businessName.trim(),
+        location: newStaff.location.trim(),
       });
-      Alert.alert('Success', 'Staff member added successfully');
+      Alert.alert(
+        'Staff added',
+        `Share this password with them: ${newStaff.password}\n\n(Note it down; it won't be shown again.)`
+      );
       setModalVisible(false);
-      setNewStaff({ name: '', phone: '' });
+      setNewStaff({ name: '', phone: '', password: '', businessName: '', location: '' });
       loadStaff();
     } catch (error: any) {
       Alert.alert('Error', error.response?.data?.detail || 'Failed to add staff');
@@ -71,7 +81,7 @@ export default function StaffManagementScreen() {
   const toggleStaffStatus = async (staffId: string, currentStatus: boolean) => {
     try {
       await api.put(`/users/${staffId}`, {
-        is_active: !currentStatus,
+        isActive: !currentStatus,
       });
       loadStaff();
     } catch (error) {
@@ -79,24 +89,52 @@ export default function StaffManagementScreen() {
     }
   };
 
+  const handleDeleteStaff = (staffId: string, name: string) => {
+    Alert.alert(
+      'Delete staff',
+      `Remove "${name}" from staff? They will not be able to login.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await api.delete(`/users/${staffId}`);
+              setDetailModalVisible(false);
+              setSelectedStaff(null);
+              loadStaff();
+            } catch (e: any) {
+              Alert.alert('Error', e.response?.data?.message || 'Failed to delete staff');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const renderStaffCard = ({ item }: { item: any }) => (
-    <View style={styles.staffCard}>
+    <TouchableOpacity
+      style={styles.staffCard}
+      onPress={() => { setSelectedStaff(item); setDetailModalVisible(true); }}
+      activeOpacity={0.85}
+    >
       <View style={styles.staffInfo}>
         <Text style={styles.staffName}>{item.name}</Text>
-        <Text style={styles.staffPhone}>{item.phone}</Text>
+        <Text style={styles.staffPhone}>📱 {item.phone}</Text>
+        {item.businessName ? <Text style={styles.staffDetail}>🏢 {item.businessName}</Text> : null}
+        {item.location ? <Text style={styles.staffDetail}>📍 {item.location}</Text> : null}
       </View>
-      <TouchableOpacity
-        style={[
-          styles.statusButton,
-          { backgroundColor: item.is_active ? '#34C759' : '#FF3B30' },
-        ]}
-        onPress={() => toggleStaffStatus(item.id, item.is_active)}
-      >
-        <Text style={styles.statusText}>
-          {item.is_active ? 'Active' : 'Inactive'}
-        </Text>
-      </TouchableOpacity>
-    </View>
+      <View style={styles.cardRight}>
+        <Text style={styles.tapHint}>Tap for details</Text>
+        <TouchableOpacity
+          style={[styles.statusButton, { backgroundColor: item.isActive ? '#34C759' : '#FF3B30' }]}
+          onPress={(e) => { e.stopPropagation(); toggleStaffStatus(item._id, item.isActive); }}
+        >
+          <Text style={styles.statusText}>{item.isActive ? 'Active' : 'Inactive'}</Text>
+        </TouchableOpacity>
+      </View>
+    </TouchableOpacity>
   );
 
   if (loading) {
@@ -110,19 +148,19 @@ export default function StaffManagementScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.title}>Staff Management</Text>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => setModalVisible(true)}
-        >
-          <Text style={styles.addButtonText}>+ Add Staff</Text>
+        <Text style={styles.title}>Staff</Text>
+        <View style={styles.headerBrand}>
+          <BrandText faded />
+        </View>
+        <TouchableOpacity style={styles.addButton} onPress={() => setModalVisible(true)} activeOpacity={0.8}>
+          <Text style={styles.addButtonText}>+ Add</Text>
         </TouchableOpacity>
       </View>
 
       <FlatList
         data={staff}
         renderItem={renderStaffCard}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item._id}
         contentContainerStyle={styles.list}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={loadStaff} />
@@ -153,10 +191,35 @@ export default function StaffManagementScreen() {
 
             <TextInput
               style={styles.input}
-              placeholder="Phone Number"
+              placeholder="Phone (10 digits only)"
               value={newStaff.phone}
-              onChangeText={(text) => setNewStaff({ ...newStaff, phone: text })}
+              onChangeText={(t) => setNewStaff({ ...newStaff, phone: t.replace(/\D/g, '').slice(0, 10) })}
               keyboardType="phone-pad"
+              maxLength={10}
+            />
+
+            <TextInput
+              style={styles.input}
+              placeholder="Password"
+              value={newStaff.password}
+              onChangeText={(text) => setNewStaff({ ...newStaff, password: text })}
+              secureTextEntry
+            />
+
+            <TextInput
+              style={styles.input}
+              placeholder="Business name"
+              value={newStaff.businessName}
+              onChangeText={(t) => setNewStaff({ ...newStaff, businessName: t })}
+            />
+
+            <TextInput
+              style={[styles.input, styles.inputArea]}
+              placeholder="Location / Address (kahan rehte hain)"
+              value={newStaff.location}
+              onChangeText={(t) => setNewStaff({ ...newStaff, location: t })}
+              multiline
+              numberOfLines={2}
             />
 
             <View style={styles.modalButtons}>
@@ -182,6 +245,46 @@ export default function StaffManagementScreen() {
           </View>
         </View>
       </Modal>
+
+      <Modal
+        visible={detailModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDetailModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.detailOverlay}
+          activeOpacity={1}
+          onPress={() => setDetailModalVisible(false)}
+        >
+          <View style={styles.detailModal}>
+            <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
+              <Text style={styles.detailTitle}>Staff details</Text>
+              {selectedStaff && (
+                <View style={styles.detailBody}>
+                  <Text style={styles.detailRow}><Text style={styles.detailLabel}>Name:</Text> {selectedStaff.name}</Text>
+                  <Text style={styles.detailRow}><Text style={styles.detailLabel}>Phone:</Text> {selectedStaff.phone}</Text>
+                  <Text style={styles.detailRow}><Text style={styles.detailLabel}>Password:</Text> {selectedStaff.plainPasswordForAdmin || '—'}</Text>
+                  <Text style={styles.detailRow}><Text style={styles.detailLabel}>Business:</Text> {selectedStaff.businessName || '—'}</Text>
+                  <Text style={styles.detailRow}><Text style={styles.detailLabel}>Location:</Text> {selectedStaff.location || '—'}</Text>
+                  <View style={[styles.detailBadge, { backgroundColor: selectedStaff.isActive ? '#34C759' : '#FF3B30' }]}>
+                    <Text style={styles.detailBadgeText}>{selectedStaff.isActive ? 'Active' : 'Inactive'}</Text>
+                  </View>
+                </View>
+              )}
+              <TouchableOpacity
+                style={styles.detailDeleteBtn}
+                onPress={() => selectedStaff && handleDeleteStaff(selectedStaff._id, selectedStaff.name)}
+              >
+                <Text style={styles.detailDeleteText}>Delete staff</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.detailCloseBtn} onPress={() => setDetailModalVisible(false)}>
+                <Text style={styles.detailCloseText}>Close</Text>
+              </TouchableOpacity>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -200,19 +303,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#e2e8f0',
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#1a1a1a',
+  },
+  headerBrand: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   addButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 16,
+    backgroundColor: '#0EA5E9',
+    paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 8,
   },
@@ -249,7 +358,21 @@ const styles = StyleSheet.create({
   },
   staffPhone: {
     fontSize: 14,
-    color: '#666',
+    color: '#64748b',
+    marginBottom: 2,
+  },
+  staffDetail: {
+    fontSize: 13,
+    color: '#64748b',
+    marginTop: 4,
+  },
+  cardRight: {
+    alignItems: 'flex-end',
+    gap: 6,
+  },
+  tapHint: {
+    fontSize: 11,
+    color: '#94a3b8',
   },
   statusButton: {
     paddingHorizontal: 16,
@@ -290,11 +413,15 @@ const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1,
-    borderColor: '#DDD',
+    borderColor: '#e2e8f0',
     borderRadius: 8,
     padding: 12,
-    fontSize: 16,
-    marginBottom: 16,
+    fontSize: 15,
+    marginBottom: 12,
+  },
+  inputArea: {
+    minHeight: 56,
+    textAlignVertical: 'top',
   },
   modalButtons: {
     flexDirection: 'row',
@@ -320,6 +447,69 @@ const styles = StyleSheet.create({
   submitButtonText: {
     color: '#fff',
     fontSize: 16,
+    fontWeight: '600',
+  },
+  detailOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  detailModal: {
+    width: '100%',
+    maxWidth: 340,
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 20,
+  },
+  detailTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    marginBottom: 14,
+  },
+  detailBody: {
+    marginBottom: 16,
+  },
+  detailRow: {
+    fontSize: 14,
+    color: '#334155',
+    marginBottom: 8,
+  },
+  detailLabel: {
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  detailBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  detailBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  detailDeleteBtn: {
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  detailDeleteText: {
+    color: '#dc2626',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  detailCloseBtn: {
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  detailCloseText: {
+    color: '#0EA5E9',
+    fontSize: 15,
     fontWeight: '600',
   },
 });

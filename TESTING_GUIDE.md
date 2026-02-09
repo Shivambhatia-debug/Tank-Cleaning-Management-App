@@ -216,14 +216,11 @@ curl "http://localhost:8001/api/users?role=staff"
 
 ## 🐛 Common Issues
 
-### Issue: OTP not working
-**Solution:** OTP is fixed to `123456` for all demo accounts
+### Issue: Login not working
+**Solution:** Use Node backend. Admin seed: phone `9319329339`, password `admin123` (see backend_node server.js seed).
 
 ### Issue: No jobs showing
-**Solution:** Run seed script again:
-```bash
-cd /app/backend && python seed_demo_data.py
-```
+**Solution:** Ensure backend_node is running and MongoDB is connected. Create jobs from Admin → Jobs tab. Optional: run `node manual_seed.js` from backend_node if you have a seed script.
 
 ### Issue: Location not tracking
 **Solution:** Grant location permissions when prompted
@@ -236,7 +233,7 @@ cd /app/backend && python seed_demo_data.py
 ## 📸 Features to Test
 
 ### Must Test ✅
-- [x] Phone OTP Login
+- [x] Phone + Password Login (Node backend)
 - [x] Role-based routing (Admin vs Staff)
 - [x] Dashboard statistics
 - [x] Job list display

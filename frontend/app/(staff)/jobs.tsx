@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../utils/api';
+import AppHeader from '../../components/AppHeader';
 
 export default function StaffJobsScreen() {
   const { user, logout } = useAuth();
@@ -27,7 +28,7 @@ export default function StaffJobsScreen() {
 
   const loadJobs = async () => {
     try {
-      const response = await api.get(`/jobs?staff_id=${user?.id}`);
+      const response = await api.get(`/jobs?staffId=${user?.id}`);
       setJobs(response.data);
     } catch (error) {
       console.error('Error loading jobs:', error);
@@ -69,15 +70,15 @@ export default function StaffJobsScreen() {
   };
 
   const renderJob = ({ item }: { item: any }) => (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={styles.jobCard}
       onPress={() => router.push({
         pathname: '/(staff)/job-detail',
-        params: { jobId: item.id }
+        params: { jobId: item._id }
       })}
     >
       <View style={styles.jobHeader}>
-        <Text style={styles.customerName}>{item.customer_name}</Text>
+        <Text style={styles.customerName}>{item.customerName}</Text>
         <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
           <Ionicons
             name={getStatusIcon(item.status) as any}
@@ -114,20 +115,12 @@ export default function StaffJobsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Hello, {user?.name}</Text>
-          <Text style={styles.role}>Your Assigned Jobs</Text>
-        </View>
-        <TouchableOpacity onPress={logout} style={styles.logoutButton}>
-          <Ionicons name="log-out-outline" size={24} color="#FF3B30" />
-        </TouchableOpacity>
-      </View>
+      <AppHeader title={user?.name} subtitle="My jobs" onLogout={logout} />
 
       <FlatList
         data={jobs}
         renderItem={renderJob}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item._id || item.id || String(Math.random())}
         contentContainerStyle={styles.list}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -153,52 +146,32 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
-  },
-  greeting: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  role: {
-    fontSize: 14,
-    color: '#8E8E93',
-    marginTop: 4,
-  },
-  logoutButton: {
-    padding: 8,
-  },
   list: {
     padding: 16,
   },
   jobCard: {
     backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#e2e8f0',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 2,
   },
   jobHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   customerName: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: '#1a1a1a',
     flex: 1,
   },
   statusBadge: {
@@ -221,36 +194,36 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   address: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 13,
+    color: '#64748b',
     flex: 1,
   },
   notes: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 8,
+    fontSize: 13,
+    color: '#64748b',
+    marginTop: 6,
     fontStyle: 'italic',
   },
   jobFooter: {
-    marginTop: 12,
+    marginTop: 10,
     paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#e2e8f0',
   },
   tapHint: {
     fontSize: 12,
-    color: '#007AFF',
+    color: '#0EA5E9',
     textAlign: 'right',
     fontWeight: '500',
   },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 100,
+    paddingTop: 80,
   },
   emptyText: {
-    fontSize: 16,
-    color: '#8E8E93',
-    marginTop: 16,
+    fontSize: 14,
+    color: '#64748b',
+    marginTop: 12,
   },
 });
