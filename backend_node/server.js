@@ -398,14 +398,23 @@ if (io) io.on('connection', (socket) => {
 });
 
 // --- HEALTH (no auth - for connectivity check) ---
-app.get('/api/health', (req, res) => {
+// On Vercel cold start, wait for DB so we report true status (connection can take 15–20s)
+app.get('/api/health', async (req, res) => {
+    const maxWaitMs = 22000;
+    const stepMs = 500;
+    let waited = 0;
+    while (mongoose.connection.readyState !== 1 && waited < maxWaitMs) {
+        await new Promise(r => setTimeout(r, stepMs));
+        waited += stepMs;
+    }
     const dbReady = mongoose.connection.readyState === 1;
     res.json({
         ok: true,
         message: 'Backend is running',
         uploadRoute: 'POST /api/jobs/:id/upload',
         dbConnected: dbReady,
-        hasJwtSecret: !!process.env.JWT_SECRET
+        hasJwtSecret: !!process.env.JWT_SECRET,
+        hasMongoUri: !!process.env.MONGO_URI
     });
 });
 
