@@ -47,8 +47,14 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 // Database Connection (skip on Vercel if MONGO_URI missing to avoid crash)
+// Longer timeouts for serverless cold start (Vercel → Atlas can be slow)
+const mongooseOptions = {
+    bufferTimeoutMS: 30000,
+    serverSelectionTimeoutMS: 20000,
+    connectTimeoutMS: 20000
+};
 if (process.env.MONGO_URI) {
-    mongoose.connect(process.env.MONGO_URI)
+    mongoose.connect(process.env.MONGO_URI, mongooseOptions)
         .then(() => {
             console.log('✅ MongoDB connected');
             seedAdmin();
@@ -97,8 +103,29 @@ const auth = (req, res, next) => {
 
 app.post('/api/auth/login', async (req, res) => {
     try {
-        const { phone, password } = req.body;
-        const user = await User.findOne({ phone });
+        if (!process.env.JWT_SECRET) {
+            return res.status(503).json({ message: 'Server misconfigured (JWT_SECRET missing). Check Vercel env vars.' });
+        }
+        // Wait for MongoDB on cold start (Vercel serverless – connection can take 15–20s)
+        const maxWaitMs = 22000;
+        const stepMs = 500;
+        let waited = 0;
+        while (mongoose.connection.readyState !== 1 && waited < maxWaitMs) {
+            await new Promise(r => setTimeout(r, stepMs));
+            waited += stepMs;
+        }
+        if (mongoose.connection.readyState !== 1) {
+            return res.status(503).json({ message: 'Database connecting. Please try again in 10–15 seconds.' });
+        }
+        const phoneStr = String(req.body.phone || '').replace(/\D/g, '').slice(0, 10);
+        const password = req.body.password;
+        if (!phoneStr || phoneStr.length !== 10) {
+            return res.status(400).json({ message: 'Enter valid 10 digit phone number' });
+        }
+        if (!password) {
+            return res.status(400).json({ message: 'Password required' });
+        }
+        const user = await User.findOne({ phone: phoneStr });
         if (!user) return res.status(400).json({ message: 'User not found' });
 
         const validPass = await user.comparePassword(password);
@@ -110,7 +137,7 @@ app.post('/api/auth/login', async (req, res) => {
             user: { id: user._id, name: user.name, phone: user.phone, role: user.role }
         });
     } catch (err) {
-        res.status(500).json({ message: err.message });
+        res.status(500).json({ message: err.message || 'Login failed' });
     }
 });
 
@@ -372,7 +399,14 @@ if (io) io.on('connection', (socket) => {
 
 // --- HEALTH (no auth - for connectivity check) ---
 app.get('/api/health', (req, res) => {
-    res.json({ ok: true, message: 'Backend is running', uploadRoute: 'POST /api/jobs/:id/upload' });
+    const dbReady = mongoose.connection.readyState === 1;
+    res.json({
+        ok: true,
+        message: 'Backend is running',
+        uploadRoute: 'POST /api/jobs/:id/upload',
+        dbConnected: dbReady,
+        hasJwtSecret: !!process.env.JWT_SECRET
+    });
 });
 
 // --- STATS ROUTES ---
