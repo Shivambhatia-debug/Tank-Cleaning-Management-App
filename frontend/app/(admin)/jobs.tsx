@@ -389,16 +389,7 @@ export default function JobsManagementScreen() {
                 <TouchableOpacity
                   style={styles.chooseOnMapButton}
                   onPress={() => {
-                    // NOTE: React Native Maps is unstable on some Android builds
-                    // and was causing the app to crash when opening the picker.
-                    // For now, ask admin to fill coordinates manually.
-                    if (Platform.OS === 'android') {
-                      Alert.alert(
-                        'Use manual location',
-                        'Please type latitude and longitude below. Map picker is temporarily disabled on this build to avoid crashes.'
-                      );
-                      return;
-                    }
+                    // Android + iOS: open full-screen map picker
                     setPickerLat(newJob.latitude || DEFAULT_MAP_REGION.latitude);
                     setPickerLng(newJob.longitude || DEFAULT_MAP_REGION.longitude);
                     setMapPickerVisible(true);

@@ -144,15 +144,15 @@ export default function DashboardScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Revenue & payments</Text>
           <View style={styles.rowCards}>
-            <View style={[styles.smallCard, { backgroundColor: '#0f766e' }]}>
-              <Text style={styles.smallCardLabel}>Today revenue</Text>
-              <Text style={styles.smallCardValue}>
+            <View style={styles.kpiCard}>
+              <Text style={styles.kpiLabel}>Today revenue</Text>
+              <Text style={styles.kpiValue}>
                 ₹{reports?.dailyRevenue?.toLocaleString?.('en-IN') ?? '0'}
               </Text>
             </View>
-            <View style={[styles.smallCard, { backgroundColor: '#2563eb' }]}>
-              <Text style={styles.smallCardLabel}>This month</Text>
-              <Text style={styles.smallCardValue}>
+            <View style={styles.kpiCard}>
+              <Text style={styles.kpiLabel}>This month</Text>
+              <Text style={styles.kpiValue}>
                 ₹{reports?.monthlyRevenue?.toLocaleString?.('en-IN') ?? '0'}
               </Text>
             </View>
@@ -433,6 +433,34 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1a1a1a',
     marginBottom: 12,
+  },
+  rowCards: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  kpiCard: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  kpiLabel: {
+    fontSize: 12,
+    color: '#64748b',
+    marginBottom: 4,
+  },
+  kpiValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0f172a',
   },
   reminderRow: {
     flexDirection: 'row',

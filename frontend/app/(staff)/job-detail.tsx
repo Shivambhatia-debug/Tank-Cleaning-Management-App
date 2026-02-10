@@ -19,6 +19,7 @@ import api, { getUploadsBaseUrl, getApiBaseUrl } from '../../utils/api';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function JobDetailScreen() {
   const { jobId } = useLocalSearchParams();
@@ -280,14 +281,24 @@ export default function JobDetailScreen() {
                     ]}
                     onPress={() => setPaymentMode(mode as any)}
                   >
-                    <Text
-                      style={[
-                        styles.paymentChipText,
-                        active && styles.paymentChipTextActive,
-                      ]}
-                    >
-                      {mode.toUpperCase()}
-                    </Text>
+                    <View style={styles.paymentChipInner}>
+                      {active && (
+                        <Ionicons
+                          name="checkmark-circle"
+                          size={16}
+                          color="#16a34a"
+                          style={{ marginRight: 4 }}
+                        />
+                      )}
+                      <Text
+                        style={[
+                          styles.paymentChipText,
+                          active && styles.paymentChipTextActive,
+                        ]}
+                      >
+                        {mode.toUpperCase()}
+                      </Text>
+                    </View>
                   </TouchableOpacity>
                 );
               })}
@@ -454,6 +465,65 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.04,
     shadowRadius: 3,
     elevation: 1,
+  },
+  fieldLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#334155',
+    marginBottom: 4,
+  },
+  paymentModesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
+  },
+  paymentChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    backgroundColor: '#f9fafb',
+  },
+  paymentChipActive: {
+    borderColor: '#22c55e',
+    backgroundColor: '#dcfce7',
+  },
+  paymentChipInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  paymentChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  paymentChipTextActive: {
+    color: '#166534',
+  },
+  remarkInput: {
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 13,
+    color: '#0f172a',
+    minHeight: 70,
+    textAlignVertical: 'top',
+    marginTop: 4,
+  },
+  paymentButton: {
+    marginTop: 12,
+    backgroundColor: '#16a34a',
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  paymentButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   customerName: {
     fontSize: 17,
