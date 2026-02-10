@@ -10,6 +10,7 @@ const jwt = require('jsonwebtoken');
 const User = require('./models/User');
 const Job = require('./models/Job');
 const Location = require('./models/Location');
+const Lead = require('./models/Lead');
 
 const app = express();
 // On Vercel (serverless) we don't create HTTP server or Socket.io - they cause crash
@@ -161,6 +162,146 @@ app.post('/api/users/staff', auth, async (req, res) => {
         res.status(201).json({ message: 'Staff created successfully' });
     } catch (err) {
         res.status(500).json({ message: err.message });
+    }
+});
+
+// --- LEADS (basic CRM) ---
+
+// Create new lead
+app.post('/api/leads', auth, async (req, res) => {
+    if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
+    try {
+        const {
+            customerName,
+            mobileNumber,
+            address,
+            latitude,
+            longitude,
+            source,
+            status,
+            tags,
+        } = req.body;
+
+        if (!customerName || !mobileNumber) {
+            return res.status(400).json({ message: 'Customer name and mobile are required' });
+        }
+
+        const mobileDigits = String(mobileNumber).replace(/\D/g, '').slice(0, 10);
+        if (mobileDigits.length !== 10) {
+            return res.status(400).json({ message: 'Enter valid 10 digit mobile number' });
+        }
+
+        const lead = new Lead({
+            customerName: customerName.trim(),
+            mobileNumber: mobileDigits,
+            address: (address || '').trim(),
+            latitude,
+            longitude,
+            source: source || 'Direct Call',
+            status: status || 'New',
+            tags: Array.isArray(tags) ? tags : [],
+            createdBy: req.user.id,
+        });
+
+        await lead.save();
+        res.status(201).json(lead);
+    } catch (err) {
+        res.status(500).json({ message: err.message || 'Failed to create lead' });
+    }
+});
+
+// List leads (optional status filter)
+app.get('/api/leads', auth, async (req, res) => {
+    if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
+    try {
+        const { status } = req.query;
+        const filter = {};
+        if (status) filter.status = status;
+        const leads = await Lead.find(filter).sort({ createdAt: -1 });
+        res.json(leads);
+    } catch (err) {
+        res.status(500).json({ message: err.message || 'Failed to load leads' });
+    }
+});
+
+// Get single lead with logs
+app.get('/api/leads/:id', auth, async (req, res) => {
+    if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
+    try {
+        const lead = await Lead.findById(req.params.id);
+        if (!lead) return res.status(404).json({ message: 'Lead not found' });
+        res.json(lead);
+    } catch (err) {
+        res.status(500).json({ message: err.message || 'Failed to load lead' });
+    }
+});
+
+// Update lead basic fields / status
+app.put('/api/leads/:id', auth, async (req, res) => {
+    if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
+    try {
+        const updates = {};
+        const allowedFields = [
+            'customerName',
+            'mobileNumber',
+            'address',
+            'latitude',
+            'longitude',
+            'source',
+            'status',
+            'nextFollowUpAt',
+            'tags',
+        ];
+
+        for (const key of allowedFields) {
+            if (req.body[key] !== undefined) {
+                updates[key] = req.body[key];
+            }
+        }
+
+        if (updates.mobileNumber) {
+            const mobileDigits = String(updates.mobileNumber).replace(/\D/g, '').slice(0, 10);
+            if (mobileDigits.length !== 10) {
+                return res.status(400).json({ message: 'Enter valid 10 digit mobile number' });
+            }
+            updates.mobileNumber = mobileDigits;
+        }
+
+        const lead = await Lead.findByIdAndUpdate(req.params.id, updates, { new: true });
+        if (!lead) return res.status(404).json({ message: 'Lead not found' });
+        res.json(lead);
+    } catch (err) {
+        res.status(500).json({ message: err.message || 'Failed to update lead' });
+    }
+});
+
+// Add discussion log to a lead
+app.post('/api/leads/:id/logs', auth, async (req, res) => {
+    if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
+    try {
+        const { notes, nextFollowUpAt } = req.body;
+        if (!notes || !String(notes).trim()) {
+            return res.status(400).json({ message: 'Notes are required' });
+        }
+
+        const lead = await Lead.findById(req.params.id);
+        if (!lead) return res.status(404).json({ message: 'Lead not found' });
+
+        const log = {
+            notes: String(notes).trim(),
+            by: 'Admin',
+        };
+        if (nextFollowUpAt) {
+            log.nextFollowUpAt = new Date(nextFollowUpAt);
+            lead.nextFollowUpAt = log.nextFollowUpAt;
+        }
+
+        lead.discussionLogs.push(log);
+        await lead.save();
+
+        res.status(201).json(lead);
+    } catch (err) {
+        res.status(500).json({ message: err.message || 'Failed to add log' });
     }
 });
 

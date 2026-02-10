@@ -365,6 +365,16 @@ export default function JobsManagementScreen() {
                 <TouchableOpacity
                   style={styles.chooseOnMapButton}
                   onPress={() => {
+                    // NOTE: React Native Maps is unstable on some Android builds
+                    // and was causing the app to crash when opening the picker.
+                    // For now, ask admin to fill coordinates manually.
+                    if (Platform.OS === 'android') {
+                      Alert.alert(
+                        'Use manual location',
+                        'Please type latitude and longitude below. Map picker is temporarily disabled on this build to avoid crashes.'
+                      );
+                      return;
+                    }
                     setPickerLat(newJob.latitude || DEFAULT_MAP_REGION.latitude);
                     setPickerLng(newJob.longitude || DEFAULT_MAP_REGION.longitude);
                     setMapPickerVisible(true);
@@ -397,6 +407,30 @@ export default function JobsManagementScreen() {
                   />
                 </View>
               </View>
+
+              {/* Mini map preview so admin can see marker for the typed lat/lng,
+                  without opening the full-screen picker (which was crashing on
+                  some Android builds). */}
+              {Platform.OS !== 'web' && newJob.latitude && newJob.longitude ? (
+                <View style={styles.previewMapWrap}>
+                  <Text style={styles.labelSmall}>Location preview</Text>
+                  <MapView
+                    style={styles.previewMap}
+                    pointerEvents="none"
+                    region={{
+                      latitude: newJob.latitude,
+                      longitude: newJob.longitude,
+                      latitudeDelta: DEFAULT_MAP_REGION.latitudeDelta,
+                      longitudeDelta: DEFAULT_MAP_REGION.longitudeDelta,
+                    }}
+                  >
+                    <Marker
+                      coordinate={{ latitude: newJob.latitude, longitude: newJob.longitude }}
+                      title="Job location"
+                    />
+                  </MapView>
+                </View>
+              ) : null}
 
               <View style={styles.row}>
                 <View style={styles.col}>
@@ -894,5 +928,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#fff',
     fontWeight: '600',
+  },
+  previewMapWrap: {
+    marginTop: 4,
+    marginBottom: 12,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#e5e7eb',
+  },
+  previewMap: {
+    width: '100%',
+    height: 140,
   },
 });

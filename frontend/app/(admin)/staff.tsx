@@ -185,6 +185,7 @@ export default function StaffManagementScreen() {
             <TextInput
               style={styles.input}
               placeholder="Staff Name"
+              placeholderTextColor="#9CA3AF"
               value={newStaff.name}
               onChangeText={(text) => setNewStaff({ ...newStaff, name: text })}
             />
@@ -192,6 +193,7 @@ export default function StaffManagementScreen() {
             <TextInput
               style={styles.input}
               placeholder="Phone (10 digits only)"
+              placeholderTextColor="#9CA3AF"
               value={newStaff.phone}
               onChangeText={(t) => setNewStaff({ ...newStaff, phone: t.replace(/\D/g, '').slice(0, 10) })}
               keyboardType="phone-pad"
@@ -201,6 +203,7 @@ export default function StaffManagementScreen() {
             <TextInput
               style={styles.input}
               placeholder="Password"
+              placeholderTextColor="#9CA3AF"
               value={newStaff.password}
               onChangeText={(text) => setNewStaff({ ...newStaff, password: text })}
               secureTextEntry
@@ -209,6 +212,7 @@ export default function StaffManagementScreen() {
             <TextInput
               style={styles.input}
               placeholder="Business name"
+              placeholderTextColor="#9CA3AF"
               value={newStaff.businessName}
               onChangeText={(t) => setNewStaff({ ...newStaff, businessName: t })}
             />
@@ -216,6 +220,7 @@ export default function StaffManagementScreen() {
             <TextInput
               style={[styles.input, styles.inputArea]}
               placeholder="Location / Address (kahan rehte hain)"
+              placeholderTextColor="#9CA3AF"
               value={newStaff.location}
               onChangeText={(t) => setNewStaff({ ...newStaff, location: t })}
               multiline
@@ -417,6 +422,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     fontSize: 15,
+    color: '#111827', // dark text so it stays visible in light/dark mode
+    backgroundColor: '#ffffff',
     marginBottom: 12,
   },
   inputArea: {

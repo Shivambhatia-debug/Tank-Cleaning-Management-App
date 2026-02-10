@@ -140,15 +140,15 @@ export default function DashboardScreen() {
 
           <TouchableOpacity
             style={styles.actionCard}
-            onPress={() => router.push('/(admin)/jobs')}
+            onPress={() => router.push('/(admin)/leads')}
           >
             <View style={styles.actionLeft}>
               <View style={[styles.actionIcon, { backgroundColor: '#E3F2FD' }]}>
                 <Text style={styles.actionIconText}>➕</Text>
               </View>
               <View style={styles.actionContent}>
-                <Text style={styles.actionTitle}>Create job</Text>
-                <Text style={styles.actionSubtitle}>New cleaning task</Text>
+              <Text style={styles.actionTitle}>Add lead</Text>
+              <Text style={styles.actionSubtitle}>New enquiry</Text>
               </View>
             </View>
             <Text style={styles.actionArrow}>›</Text>
