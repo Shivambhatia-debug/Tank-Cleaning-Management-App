@@ -10,6 +10,7 @@ import {
   Image,
   Linking,
   Platform,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -25,6 +26,9 @@ export default function JobDetailScreen() {
   const [job, setJob] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [remark, setRemark] = useState('');
+  const [paymentMode, setPaymentMode] = useState<'cash' | 'upi' | 'online' | 'pending'>('cash');
+  const [paymentUpdating, setPaymentUpdating] = useState(false);
 
   // ... (pickImage function to be added next via full implementation if needed, checking existing imports)
 
@@ -38,6 +42,12 @@ export default function JobDetailScreen() {
       if (!jobId) return;
       const response = await api.get(`/jobs/${jobId}`);
       setJob(response.data);
+      if (response.data?.staffRemark) {
+        setRemark(response.data.staffRemark);
+      }
+      if (response.data?.paymentMode) {
+        setPaymentMode(response.data.paymentMode);
+      }
     } catch (error) {
       console.error('Error loading job:', error);
       Alert.alert('Error', 'Failed to load job details');
@@ -130,6 +140,25 @@ export default function JobDetailScreen() {
     }
   };
 
+  const updatePaymentAndRemark = async () => {
+    if (!jobId) return;
+    setPaymentUpdating(true);
+    try {
+      await api.put(`/jobs/${jobId}`, {
+        paymentStatus: 'paid',
+        paymentMode,
+        staffRemark: remark.trim(),
+      });
+      Alert.alert('Done', 'Payment marked as PAID and remark saved');
+      await loadJob();
+    } catch (error: any) {
+      console.error('Payment update error', error.response?.data || error.message);
+      Alert.alert('Error', 'Failed to update payment');
+    } finally {
+      setPaymentUpdating(false);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending':
@@ -191,6 +220,9 @@ export default function JobDetailScreen() {
             <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#eee' }}>
               <Text style={{ fontSize: 14, color: '#555', marginBottom: 4 }}>📱 {job.mobileNumber || 'N/A'}</Text>
               <Text style={{ fontSize: 14, color: '#555' }}>🛢 {job.tankSize || 'Unknown Size'} • {job.serviceType || 'N/A'}</Text>
+              <Text style={{ fontSize: 14, color: '#555', marginTop: 4 }}>
+                💰 {job.paymentStatus === 'paid' ? 'Paid' : 'Payment pending'} • ₹{job.serviceCharge || 0}
+              </Text>
             </View>
           </View>
         </View>
@@ -230,6 +262,63 @@ export default function JobDetailScreen() {
             </View>
           </View>
         )}
+
+        {/* Staff remark + payment update */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Payment & customer remark</Text>
+          <View style={styles.infoCard}>
+            <Text style={styles.fieldLabel}>Payment mode</Text>
+            <View style={styles.paymentModesRow}>
+              {['cash', 'upi', 'online', 'pending'].map((mode) => {
+                const active = paymentMode === mode;
+                return (
+                  <TouchableOpacity
+                    key={mode}
+                    style={[
+                      styles.paymentChip,
+                      active && styles.paymentChipActive,
+                    ]}
+                    onPress={() => setPaymentMode(mode as any)}
+                  >
+                    <Text
+                      style={[
+                        styles.paymentChipText,
+                        active && styles.paymentChipTextActive,
+                      ]}
+                    >
+                      {mode.toUpperCase()}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <Text style={[styles.fieldLabel, { marginTop: 12 }]}>Customer remark</Text>
+            <TextInput
+              style={styles.remarkInput}
+              placeholder="Jo bhi important baat ho (tank condition, extra work, etc.)"
+              placeholderTextColor="#9ca3af"
+              multiline
+              numberOfLines={3}
+              value={remark}
+              onChangeText={setRemark}
+            />
+
+            {job.paymentStatus !== 'paid' && (
+              <TouchableOpacity
+                style={styles.paymentButton}
+                onPress={updatePaymentAndRemark}
+                disabled={paymentUpdating}
+              >
+                {paymentUpdating ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.paymentButtonText}>Mark as PAID + Save remark</Text>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
 
         {job.completionPhoto && (
           <View style={styles.section}>

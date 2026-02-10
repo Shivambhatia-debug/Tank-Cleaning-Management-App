@@ -24,6 +24,8 @@ export default function StaffManagementScreen() {
   const [selectedStaff, setSelectedStaff] = useState<any>(null);
   const [newStaff, setNewStaff] = useState({ name: '', phone: '', password: '', businessName: '', location: '' });
   const [addingStaff, setAddingStaff] = useState(false);
+  const [staffStats, setStaffStats] = useState<any | null>(null);
+  const [loadingStats, setLoadingStats] = useState(false);
 
   useEffect(() => {
     loadStaff();
@@ -113,10 +115,22 @@ export default function StaffManagementScreen() {
     );
   };
 
+  const loadStaffStats = async (staffId: string) => {
+    try {
+      setLoadingStats(true);
+      const res = await api.get(`/stats/staff/${staffId}`);
+      setStaffStats(res.data);
+    } catch (e) {
+      console.error('Staff stats error', e);
+    } finally {
+      setLoadingStats(false);
+    }
+  };
+
   const renderStaffCard = ({ item }: { item: any }) => (
     <TouchableOpacity
       style={styles.staffCard}
-      onPress={() => { setSelectedStaff(item); setDetailModalVisible(true); }}
+      onPress={() => { setSelectedStaff(item); setDetailModalVisible(true); loadStaffStats(item._id); }}
       activeOpacity={0.85}
     >
       <View style={styles.staffInfo}>
@@ -274,6 +288,29 @@ export default function StaffManagementScreen() {
                   <Text style={styles.detailRow}><Text style={styles.detailLabel}>Location:</Text> {selectedStaff.location || '—'}</Text>
                   <View style={[styles.detailBadge, { backgroundColor: selectedStaff.isActive ? '#34C759' : '#FF3B30' }]}>
                     <Text style={styles.detailBadgeText}>{selectedStaff.isActive ? 'Active' : 'Inactive'}</Text>
+                  </View>
+
+                  <View style={styles.statsBox}>
+                    <Text style={styles.statsTitle}>Performance (auto calculated)</Text>
+                    {loadingStats && (
+                      <Text style={styles.statsLine}>Loading…</Text>
+                    )}
+                    {!!staffStats && !loadingStats && (
+                      <>
+                        <Text style={styles.statsLine}>
+                          Total jobs: {staffStats.totalJobs} • Completed: {staffStats.completedJobs} ({staffStats.completionRate}%)
+                        </Text>
+                        <Text style={styles.statsLine}>
+                          Total revenue generated: ₹{staffStats.totalRevenue || 0}
+                        </Text>
+                        <Text style={styles.statsLine}>
+                          This month revenue: ₹{staffStats.monthlyRevenue || 0}
+                        </Text>
+                        <Text style={styles.statsLine}>
+                          Total incentive (per‑job): ₹{staffStats.totalIncentive || 0}
+                        </Text>
+                      </>
+                    )}
                   </View>
                 </View>
               )}

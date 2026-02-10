@@ -344,11 +344,80 @@ app.delete('/api/users/:id', auth, async (req, res) => {
 
 // --- JOB ROUTES ---
 
+// Helper: add months safely (repeat cleaning reminder = +6 months)
+function addMonths(date, months) {
+    const d = new Date(date);
+    const day = d.getDate();
+    d.setMonth(d.getMonth() + months);
+    // month roll-over handle
+    if (d.getDate() < day) {
+        d.setDate(0);
+    }
+    return d;
+}
+
 app.post('/api/jobs', auth, async (req, res) => {
     if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
     try {
-        const job = new Job(req.body);
+        const {
+            customerName,
+            address,
+            latitude,
+            longitude,
+            tankSize,
+            serviceType,
+            leadSource,
+            mobileNumber,
+            scheduledAt,
+            serviceCharge,
+            paymentMode,
+            paymentStatus,
+            staffRemark,
+            assignedStaff,
+            notes,
+            targetLatitude,
+            targetLongitude,
+            incentivePerJob
+        } = req.body;
+
+        if (!customerName || !address) {
+            return res.status(400).json({ message: 'Customer name and address are required' });
+        }
+        if (latitude == null || longitude == null) {
+            return res.status(400).json({ message: 'Latitude and longitude are required' });
+        }
+
+        const jobData = {
+            customerName: String(customerName).trim(),
+            address: String(address).trim(),
+            latitude,
+            longitude,
+            tankSize,
+            serviceType,
+            leadSource,
+            mobileNumber,
+            notes,
+            targetLatitude: targetLatitude ?? latitude,
+            targetLongitude: targetLongitude ?? longitude,
+        };
+
+        if (scheduledAt) {
+            jobData.scheduledAt = new Date(scheduledAt);
+        }
+
+        if (Array.isArray(assignedStaff) && assignedStaff.length > 0) {
+            jobData.assignedStaff = assignedStaff;
+        }
+
+        if (serviceCharge != null) jobData.serviceCharge = Number(serviceCharge) || 0;
+        if (paymentMode) jobData.paymentMode = paymentMode;
+        if (paymentStatus) jobData.paymentStatus = paymentStatus;
+        if (staffRemark) jobData.staffRemark = staffRemark;
+        if (incentivePerJob != null) jobData.incentivePerJob = Number(incentivePerJob) || 0;
+
+        const job = new Job(jobData);
         await job.save();
+
         // Ek staff ek hi job par: in staff ko doosri sab pending/in_progress jobs se hatao
         const staffIds = (job.assignedStaff || []).map(id => id.toString ? id.toString() : id);
         if (staffIds.length > 0) {
@@ -359,7 +428,7 @@ app.post('/api/jobs', auth, async (req, res) => {
         }
         res.status(201).json({ success: true, jobId: job._id });
     } catch (err) {
-        res.status(500).json({ message: err.message });
+        res.status(500).json({ message: err.message || 'Failed to create job' });
     }
 });
 
@@ -399,13 +468,34 @@ app.get('/api/jobs/:id', auth, async (req, res) => {
 
 app.put('/api/jobs/:id', auth, async (req, res) => {
     try {
-        const { status, notes } = req.body;
+        const {
+            status,
+            notes,
+            paymentStatus,
+            paymentMode,
+            staffRemark,
+            serviceCharge,
+            incentivePerJob,
+            scheduledAt
+        } = req.body;
+
         const updates = {};
         if (status) updates.status = status;
-        if (notes) updates.notes = notes;
+        if (notes !== undefined) updates.notes = notes;
+        if (paymentStatus) updates.paymentStatus = paymentStatus;
+        if (paymentMode) updates.paymentMode = paymentMode;
+        if (staffRemark !== undefined) updates.staffRemark = staffRemark;
+        if (serviceCharge != null) updates.serviceCharge = Number(serviceCharge) || 0;
+        if (incentivePerJob != null) updates.incentivePerJob = Number(incentivePerJob) || 0;
+        if (scheduledAt) updates.scheduledAt = new Date(scheduledAt);
 
         if (status === 'in_progress') updates['timeline.startedAt'] = new Date();
-        if (status === 'completed') updates['timeline.completedAt'] = new Date();
+        if (status === 'completed') {
+            const now = new Date();
+            updates['timeline.completedAt'] = now;
+            // Auto: repeat cleaning reminder after 6 months
+            updates.nextServiceAt = addMonths(now, 6);
+        }
 
         const job = await Job.findByIdAndUpdate(req.params.id, updates, { new: true });
 
@@ -578,6 +668,144 @@ app.get('/api/stats/dashboard', auth, async (req, res) => {
         });
     } catch (err) {
         res.status(500).json({ message: err.message });
+    }
+});
+
+// Staff performance summary (for Staff Dashboard / Admin detail)
+app.get('/api/stats/staff/:id', auth, async (req, res) => {
+    try {
+        const staffId = req.params.id;
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+        // Jobs jahan yeh staff assigned hai
+        const match = { assignedStaff: staffId };
+
+        const [allJobs, monthlyJobs] = await Promise.all([
+            Job.find(match),
+            Job.find({ ...match, 'timeline.completedAt': { $gte: startOfMonth } })
+        ]);
+
+        const totalJobs = allJobs.length;
+        const completedJobs = allJobs.filter(j => j.status === 'completed').length;
+        const totalRevenue = allJobs.reduce((sum, j) => sum + (j.serviceCharge || 0), 0);
+
+        // Incentive calculation: per completed job * incentivePerJob (fallback 20)
+        const DEFAULT_INCENTIVE = 20;
+        const completedForIncentive = allJobs.filter(j => j.status === 'completed');
+        const totalIncentive = completedForIncentive.reduce((sum, j) => {
+            const per = j.incentivePerJob != null && !isNaN(j.incentivePerJob) ? j.incentivePerJob : DEFAULT_INCENTIVE;
+            return sum + per;
+        }, 0);
+
+        const monthlyRevenue = monthlyJobs.reduce((sum, j) => sum + (j.serviceCharge || 0), 0);
+
+        res.json({
+            staffId,
+            totalJobs,
+            completedJobs,
+            totalRevenue,
+            monthlyRevenue,
+            totalIncentive,
+            completionRate: totalJobs ? Math.round((completedJobs / totalJobs) * 100) : 0
+        });
+    } catch (err) {
+        res.status(500).json({ message: err.message || 'Failed to load staff stats' });
+    }
+});
+
+// --- REPORTS & REMINDERS ---
+
+// High level reports + reminder buckets for Admin Reports screen
+app.get('/api/reports/summary', auth, async (req, res) => {
+    if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
+    try {
+        const now = new Date();
+        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+        // Daily & Monthly Revenue (paid jobs)
+        const [dailyPaidJobs, monthlyPaidJobs] = await Promise.all([
+            Job.find({
+                paymentStatus: 'paid',
+                'timeline.completedAt': { $gte: startOfDay }
+            }),
+            Job.find({
+                paymentStatus: 'paid',
+                'timeline.completedAt': { $gte: startOfMonth }
+            })
+        ]);
+
+        const dailyRevenue = dailyPaidJobs.reduce((sum, j) => sum + (j.serviceCharge || 0), 0);
+        const monthlyRevenue = monthlyPaidJobs.reduce((sum, j) => sum + (j.serviceCharge || 0), 0);
+
+        // Staff wise revenue (paid)
+        const staffWise = await Job.aggregate([
+            { $match: { paymentStatus: 'paid', assignedStaff: { $exists: true, $ne: [] } } },
+            { $unwind: '$assignedStaff' },
+            {
+                $group: {
+                    _id: '$assignedStaff',
+                    revenue: { $sum: { $ifNull: ['$serviceCharge', 0] } },
+                    jobs: { $sum: 1 }
+                }
+            }
+        ]);
+
+        // Pending payments
+        const pendingPayments = await Job.find({ paymentStatus: 'pending' })
+            .select('customerName mobileNumber serviceCharge paymentMode status timeline.completedAt');
+
+        // Repeat customers (same mobileNumber with >1 job)
+        const repeatAgg = await Job.aggregate([
+            { $match: { mobileNumber: { $exists: true, $ne: '' } } },
+            {
+                $group: {
+                    _id: '$mobileNumber',
+                    customerName: { $first: '$customerName' },
+                    totalJobs: { $sum: 1 },
+                    totalRevenue: { $sum: { $ifNull: ['$serviceCharge', 0] } },
+                    lastServiceAt: { $max: '$timeline.completedAt' }
+                }
+            },
+            { $match: { totalJobs: { $gt: 1 } } },
+            { $sort: { totalJobs: -1 } }
+        ]);
+
+        // Follow-up reminders: leads jinka nextFollowUpAt aaj ya future me hai
+        const followUpLeads = await Lead.find({
+            nextFollowUpAt: { $gte: startOfDay },
+            status: { $in: ['New', 'Follow-up', 'Confirmed'] }
+        }).select('customerName mobileNumber nextFollowUpAt status');
+
+        // Repeat cleaning reminders: jobs jinka nextServiceAt 15 din ke andar hai
+        const fifteenDaysLater = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000);
+        const repeatJobs = await Job.find({
+            nextServiceAt: { $gte: startOfDay, $lte: fifteenDaysLater }
+        }).select('customerName mobileNumber nextServiceAt serviceType tankSize');
+
+        // Upcoming jobs (job reminder) based on scheduledAt (next 6 hours)
+        const sixHoursLater = new Date(now.getTime() + 6 * 60 * 60 * 1000);
+        const upcomingJobs = await Job.find({
+            scheduledAt: { $gte: now, $lte: sixHoursLater },
+            status: { $in: ['pending', 'in_progress'] }
+        }).select('customerName mobileNumber scheduledAt status assignedStaff');
+
+        res.json({
+            today: startOfDay,
+            dailyRevenue,
+            monthlyRevenue,
+            staffWise,
+            pendingPayments,
+            repeatCustomers: repeatAgg,
+            reminders: {
+                followUps: followUpLeads,
+                repeatCleanings: repeatJobs,
+                upcomingJobs
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ message: err.message || 'Failed to load reports' });
     }
 });
 

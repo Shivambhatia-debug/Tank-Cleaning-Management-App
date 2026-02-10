@@ -23,6 +23,7 @@ export default function DashboardScreen() {
   const { user, logout } = useAuth();
   const router = useRouter();
   const [stats, setStats] = useState<any>(null);
+  const [reports, setReports] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [networkError, setNetworkError] = useState<string | null>(null);
@@ -36,8 +37,12 @@ export default function DashboardScreen() {
   const loadStats = async () => {
     setNetworkError(null);
     try {
-      const response = await api.get('/stats/dashboard');
-      setStats(response.data);
+      const [statsRes, reportsRes] = await Promise.all([
+        api.get('/stats/dashboard'),
+        api.get('/reports/summary'),
+      ]);
+      setStats(statsRes.data);
+      setReports(reportsRes.data);
     } catch (error: any) {
       console.error('Error loading stats:', error);
       const isNetwork = error?.message === 'Network Error' || error?.code === 'ERR_NETWORK';
@@ -132,6 +137,127 @@ export default function DashboardScreen() {
                 <Text style={styles.statLabel}>Active Staff</Text>
               </View>
             </View>
+          </View>
+        </View>
+
+        {/* Revenue & Payments summary */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Revenue & payments</Text>
+          <View style={styles.rowCards}>
+            <View style={[styles.smallCard, { backgroundColor: '#0f766e' }]}>
+              <Text style={styles.smallCardLabel}>Today revenue</Text>
+              <Text style={styles.smallCardValue}>
+                ₹{reports?.dailyRevenue?.toLocaleString?.('en-IN') ?? '0'}
+              </Text>
+            </View>
+            <View style={[styles.smallCard, { backgroundColor: '#2563eb' }]}>
+              <Text style={styles.smallCardLabel}>This month</Text>
+              <Text style={styles.smallCardValue}>
+                ₹{reports?.monthlyRevenue?.toLocaleString?.('en-IN') ?? '0'}
+              </Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            style={styles.linkRow}
+            onPress={() => router.push('/(admin)/jobs')}
+          >
+            <Text style={styles.linkText}>
+              Pending payments: {reports?.pendingPayments?.length ?? 0}
+            </Text>
+            <Text style={styles.actionArrow}>›</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Reminders: Follow‑ups + repeat cleaning + upcoming jobs */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Today reminders</Text>
+
+          <View style={styles.reminderCard}>
+            <Text style={styles.reminderTitle}>Follow‑ups (Leads)</Text>
+            {reports?.reminders?.followUps?.length ? (
+              reports.reminders.followUps.slice(0, 3).map((l: any) => (
+                <View key={l._id} style={styles.reminderRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.reminderLine}>
+                      {l.customerName} – {l.mobileNumber}
+                    </Text>
+                    <Text style={styles.reminderSub}>
+                      {new Date(l.nextFollowUpAt).toLocaleString()}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.waButton}
+                    onPress={() => {
+                      const msg = encodeURIComponent(
+                        `Namaste ${l.customerName},\n\nCleaning Hero se aapke tank cleaning ke follow-up ke liye call kar rahe hain.\n\n– Cleaning Hero`
+                      );
+                      const url = `https://wa.me/91${l.mobileNumber}?text=${msg}`;
+                      // We rely on Linking from React Native; Expo will open WhatsApp
+                      // (no import here – kept simple deeplink)
+                      // @ts-ignore
+                      import('react-native').then(({ Linking }) => Linking.openURL(url));
+                    }}
+                  >
+                    <Text style={styles.waButtonText}>WhatsApp</Text>
+                  </TouchableOpacity>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.reminderEmpty}>No follow‑ups scheduled</Text>
+            )}
+          </View>
+
+          <View style={styles.reminderCard}>
+            <Text style={styles.reminderTitle}>Repeat cleaning (next 15 days)</Text>
+            {reports?.reminders?.repeatCleanings?.length ? (
+              reports.reminders.repeatCleanings.slice(0, 3).map((j: any) => (
+                <View key={j._id} style={styles.reminderRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.reminderLine}>
+                      {j.customerName} – {j.mobileNumber}
+                    </Text>
+                    <Text style={styles.reminderSub}>
+                      Next: {new Date(j.nextServiceAt).toLocaleDateString()}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.waButton}
+                    onPress={() => {
+                      const msg = encodeURIComponent(
+                        `Namaste ${j.customerName},\n\nAapki paichli tank cleaning ke 6 mahine complete ho gaye hain. Next cleaning due hai.\n\nAap kab slot book karwana chahenge?\n\n– Cleaning Hero`
+                      );
+                      const url = `https://wa.me/91${j.mobileNumber}?text=${msg}`;
+                      // @ts-ignore
+                      import('react-native').then(({ Linking }) => Linking.openURL(url));
+                    }}
+                  >
+                    <Text style={styles.waButtonText}>WhatsApp</Text>
+                  </TouchableOpacity>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.reminderEmpty}>No repeat cleaning due</Text>
+            )}
+          </View>
+
+          <View style={styles.reminderCard}>
+            <Text style={styles.reminderTitle}>Upcoming jobs (next 6 hours)</Text>
+            {reports?.reminders?.upcomingJobs?.length ? (
+              reports.reminders.upcomingJobs.slice(0, 3).map((j: any) => (
+                <View key={j._id} style={styles.reminderRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.reminderLine}>
+                      {j.customerName} – {j.mobileNumber}
+                    </Text>
+                    <Text style={styles.reminderSub}>
+                      {new Date(j.scheduledAt).toLocaleTimeString()}
+                    </Text>
+                  </View>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.reminderEmpty}>No upcoming jobs</Text>
+            )}
           </View>
         </View>
 
@@ -308,6 +434,13 @@ const styles = StyleSheet.create({
     color: '#1a1a1a',
     marginBottom: 12,
   },
+  reminderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 6,
+    gap: 8,
+  },
   actionCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -323,6 +456,21 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.03,
     shadowRadius: 4,
     elevation: 1,
+  },
+  reminderSub: {
+    fontSize: 11,
+    color: '#6b7280',
+  },
+  waButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: '#22c55e',
+  },
+  waButtonText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#f9fafb',
   },
   actionLeft: {
     flexDirection: 'row',

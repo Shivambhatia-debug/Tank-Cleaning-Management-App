@@ -51,6 +51,9 @@ export default function JobsManagementScreen() {
     service_type: 'Water Tank',
     lead_source: 'Call',
     service_charge: '',
+    scheduled_at: '',
+    incentive_per_job: '',
+    payment_mode: 'pending',
   });
 
   useEffect(() => {
@@ -92,7 +95,7 @@ export default function JobsManagementScreen() {
     setCreatingJob(true);
     try {
       // Map frontend state to backend model keys
-      const jobData = {
+      const jobData: any = {
         customerName: newJob.customer_name,
         address: newJob.address,
         // Use entered coordinates, or default to generic center if 0
@@ -109,7 +112,15 @@ export default function JobsManagementScreen() {
         serviceType: newJob.service_type,
         leadSource: newJob.lead_source,
         serviceCharge: Number(newJob.service_charge) || 0,
+        paymentMode: (newJob.payment_mode || 'pending').toLowerCase(),
       };
+
+      if (newJob.scheduled_at) {
+        jobData.scheduledAt = newJob.scheduled_at;
+      }
+      if (newJob.incentive_per_job) {
+        jobData.incentivePerJob = Number(newJob.incentive_per_job) || 0;
+      }
 
       await api.post('/jobs', jobData);
       Alert.alert('Success', 'Job created successfully');
@@ -229,6 +240,19 @@ export default function JobsManagementScreen() {
       <View style={{ marginTop: 4, marginBottom: 8 }}>
         <Text style={{ fontSize: 12, color: '#555' }}>📱 {item.mobileNumber || 'N/A'}</Text>
         <Text style={{ fontSize: 12, color: '#555' }}>🛢 {item.tankSize} • {item.serviceType}</Text>
+        <Text style={{ fontSize: 12, color: '#555' }}>
+          💰 {item.paymentStatus === 'paid' ? 'Paid' : 'Payment pending'} • ₹{item.serviceCharge || 0}
+        </Text>
+        {item.scheduledAt && (
+          <Text style={{ fontSize: 11, color: '#6b7280' }}>
+            🗓 {new Date(item.scheduledAt).toLocaleString()}
+          </Text>
+        )}
+        {item.nextServiceAt && (
+          <Text style={{ fontSize: 11, color: '#16a34a' }}>
+            🔁 Next cleaning: {new Date(item.nextServiceAt).toLocaleDateString()}
+          </Text>
+        )}
       </View>
 
       {item.completionPhoto && (
@@ -454,6 +478,37 @@ export default function JobsManagementScreen() {
                   />
                 </View>
               </View>
+
+          <Text style={styles.label}>Scheduled Date & Time (optional)</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="e.g. 2026-02-11T10:00:00"
+            value={newJob.scheduled_at}
+            onChangeText={(text) => setNewJob({ ...newJob, scheduled_at: text })}
+          />
+
+          <View style={styles.row}>
+            <View style={styles.col}>
+              <Text style={styles.label}>Per job incentive (₹)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. 20"
+                value={newJob.incentive_per_job}
+                onChangeText={(text) => setNewJob({ ...newJob, incentive_per_job: text })}
+                keyboardType="numeric"
+              />
+            </View>
+            <View style={{ width: 10 }} />
+            <View style={styles.col}>
+              <Text style={styles.label}>Payment mode</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="cash / upi / online / pending"
+                value={newJob.payment_mode}
+                onChangeText={(text) => setNewJob({ ...newJob, payment_mode: text })}
+              />
+            </View>
+          </View>
 
               <Text style={styles.label}>Service Details</Text>
               <View style={styles.row}>
