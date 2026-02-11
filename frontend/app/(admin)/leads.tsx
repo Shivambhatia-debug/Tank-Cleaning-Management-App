@@ -15,9 +15,24 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AppHeader from '../../components/AppHeader';
-import { decode as decodePlusCode } from 'pluscodes';
+import { decode as decodePlusCode, expand as expandPlusCode } from 'pluscodes';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../utils/api';
+
+// Muzaffarpur area ke liye reference location (short Plus Code expand karne ke liye)
+const PLUS_CODE_REF = { latitude: 26.1775, longitude: 85.8714 };
+
+// Full + short (local) Plus Code dono support karega – humesha Muzaffarpur ke aas‑paas treat karega
+const decodeAnyPlusCode = (code: string) => {
+  const raw = (code || '').trim().toUpperCase();
+  if (!raw) {
+    throw new Error('Empty Plus Code');
+  }
+  // Humesha local/short code maan kar Muzaffarpur reference se expand karo,
+  // taaki 5VMW+979 jaise codes bhi yahi region me aaye.
+  const full = expandPlusCode(raw, PLUS_CODE_REF);
+  return decodePlusCode(full);
+};
 
 const JOB_STATUS_OPTIONS = [
   'New Lead',
@@ -68,6 +83,7 @@ const STATUS_OPTIONS = ['All', 'New', 'Follow-up', 'Confirmed', 'Cancelled', 'Co
 export default function LeadsScreen() {
   const { user } = useAuth();
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [staff, setStaff] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filterStatus, setFilterStatus] = useState<(typeof STATUS_OPTIONS)[number]>('All');
@@ -106,6 +122,7 @@ export default function LeadsScreen() {
   const [detailPlusCode, setDetailPlusCode] = useState('');
   const [detailJobStatus, setDetailJobStatus] = useState<(typeof JOB_STATUS_OPTIONS)[number]>('New Lead');
   const [detailPaymentStatus, setDetailPaymentStatus] = useState<(typeof PAYMENT_STATUS_OPTIONS)[number]>('Pending');
+   const [selectedJobStaffIds, setSelectedJobStaffIds] = useState<string[]>([]);
 
   useEffect(() => {
     loadLeads();
@@ -116,8 +133,12 @@ export default function LeadsScreen() {
     try {
       const params: any = {};
       if (filterStatus !== 'All') params.status = filterStatus;
-      const res = await api.get<Lead[]>('/leads', { params });
-      setLeads(res.data);
+      const [leadsRes, staffRes] = await Promise.all([
+        api.get<Lead[]>('/leads', { params }),
+        api.get('/users?role=staff'),
+      ]);
+      setLeads(leadsRes.data);
+      setStaff(Array.isArray(staffRes.data) ? staffRes.data : []);
     } catch (err: any) {
       console.error('Error loading leads', err.response?.data || err.message);
       Alert.alert('Error', 'Failed to load leads');
@@ -173,7 +194,7 @@ export default function LeadsScreen() {
 
       if (newLead.plusCode.trim()) {
         try {
-          const { latitude, longitude } = decodePlusCode(newLead.plusCode.trim());
+          const { latitude, longitude } = decodeAnyPlusCode(newLead.plusCode.trim());
           if (
             typeof latitude === 'number' &&
             typeof longitude === 'number' &&
@@ -233,6 +254,8 @@ export default function LeadsScreen() {
       setSelectedLead(res.data);
       setDetailJobStatus((res.data.jobStatus as any) || 'New Lead');
       setDetailPaymentStatus((res.data.paymentStatus as any) || 'Pending');
+      setDetailPlusCode(res.data.plusCode || '');
+      setSelectedJobStaffIds([]);
       setDetailModalVisible(true);
     } catch (err: any) {
       console.error('Load lead detail error', err.response?.data || err.message);
@@ -280,26 +303,67 @@ export default function LeadsScreen() {
 
   const handleCreateJobFromLead = async () => {
     if (!selectedLead) return;
+    if (selectedJobStaffIds.length === 0) {
+      Alert.alert(
+        'Assign staff first',
+        'Please select at least one staff member for this job before converting the lead.'
+      );
+      return;
+    }
     setCreatingJobFromLead(true);
     try {
       // Default fallback location (same as Jobs screen)
       const DEFAULT_LAT = 26.1775;
       const DEFAULT_LNG = 85.8714;
 
+      // Jo bhi latest Plus Code input me hai (detailPlusCode) usko priority do.
+      const activePlusCode = (detailPlusCode || selectedLead.plusCode || '').trim();
+
+      const addressFromLead =
+        (selectedLead.address && selectedLead.address.trim()) ||
+        (selectedLead.area && selectedLead.area.trim()) ||
+        (activePlusCode && `Plus Code: ${activePlusCode}`) ||
+        'Address from lead';
+
+      // Try to use precise coordinates from lead; if missing but Plus Code exists
+      // (prefer latest activePlusCode from field), decode yahi par.
+      let latFromLead = selectedLead.latitude as number | null | undefined;
+      let lngFromLead = selectedLead.longitude as number | null | undefined;
+      if (
+        (latFromLead == null || Number.isNaN(latFromLead)) &&
+        (lngFromLead == null || Number.isNaN(lngFromLead)) &&
+        activePlusCode
+      ) {
+        try {
+          const decoded = decodeAnyPlusCode(activePlusCode);
+          if (
+            typeof decoded.latitude === 'number' &&
+            typeof decoded.longitude === 'number' &&
+            !Number.isNaN(decoded.latitude) &&
+            !Number.isNaN(decoded.longitude)
+          ) {
+            latFromLead = decoded.latitude;
+            lngFromLead = decoded.longitude;
+          }
+        } catch {
+          // ignore; will fallback to default below
+        }
+      }
+
       const payload: any = {
         customerName: selectedLead.customerName,
         mobileNumber: selectedLead.mobileNumber,
-        address: selectedLead.address || '',
+        address: addressFromLead,
         tankSize: '500L',
         serviceType: 'Water Tank',
         leadSource: selectedLead.source || 'Lead',
         serviceCharge: 0,
         paymentMode: 'pending',
-        assignedStaff: [],
+        assignedStaff: selectedJobStaffIds,
         notes: `Job created from lead ${selectedLead._id}`,
       };
-      const lat = selectedLead.latitude ?? DEFAULT_LAT;
-      const lng = selectedLead.longitude ?? DEFAULT_LNG;
+      const lat = latFromLead ?? DEFAULT_LAT;
+      const lng = lngFromLead ?? DEFAULT_LNG;
       payload.latitude = lat;
       payload.longitude = lng;
       payload.targetLatitude = lat;
@@ -774,6 +838,50 @@ export default function LeadsScreen() {
                   <Text style={styles.modalBtnPrimaryText}>Update status</Text>
                 </TouchableOpacity>
 
+                {/* Assign staff for job created from this lead */}
+                <View style={styles.addLogSection}>
+                  <Text style={styles.labelSmall}>Assign staff for this job (optional)</Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={{ marginBottom: 6 }}
+                  >
+                    <View style={{ flexDirection: 'row', gap: 6 }}>
+                      {(staff.filter((s) => s.isActive !== false) || []).map((s) => {
+                        const id = s._id;
+                        const active = selectedJobStaffIds.includes(id);
+                        return (
+                          <TouchableOpacity
+                            key={id}
+                            style={[
+                              styles.statusPill,
+                              active && styles.statusPillActive,
+                            ]}
+                            onPress={() => {
+                              if (active) {
+                                setSelectedJobStaffIds(
+                                  selectedJobStaffIds.filter((x) => x !== id)
+                                );
+                              } else {
+                                setSelectedJobStaffIds([...selectedJobStaffIds, id]);
+                              }
+                            }}
+                          >
+                            <Text
+                              style={[
+                                styles.statusPillText,
+                                active && styles.statusPillTextActive,
+                              ]}
+                            >
+                              {s.name}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </ScrollView>
+                </View>
+
                 <View style={styles.logsSection}>
                   <Text style={styles.logsTitle}>Conversation log</Text>
                   <ScrollView style={styles.logsList}>
@@ -830,11 +938,11 @@ export default function LeadsScreen() {
                     value={detailPlusCode}
                     autoCapitalize="characters"
                     onChangeText={setDetailPlusCode}
-                    onEndEditing={() => {
+                    onEndEditing={async () => {
                       const code = detailPlusCode.trim();
-                      if (!code) return;
+                      if (!code || !selectedLead?._id) return;
                       try {
-                        const { latitude, longitude } = decodePlusCode(code);
+                        const { latitude, longitude } = decodeAnyPlusCode(code);
                         if (
                           typeof latitude === 'number' &&
                           typeof longitude === 'number' &&
@@ -845,7 +953,17 @@ export default function LeadsScreen() {
                             ...selectedLead,
                             latitude,
                             longitude,
+                            plusCode: code,
                           });
+                          try {
+                            await api.put(`/leads/${selectedLead._id}`, {
+                              plusCode: code,
+                              latitude,
+                              longitude,
+                            });
+                          } catch (err) {
+                            console.error('Lead plusCode update error', err);
+                          }
                           Alert.alert(
                             'Location set',
                             'Plus Code se job location set ho gaya. Ab "Convert to job" dabayen.'

@@ -137,6 +137,12 @@ export default function LiveMapScreen() {
   const jobLng = job.longitude ?? job.targetLongitude ?? null;
   const staffList = Array.isArray(job.assignedStaff) ? job.assignedStaff : [];
 
+  const rawAddress = String(job.address || '').trim();
+  const isPlaceholderAddress = rawAddress.toLowerCase().startsWith('address from lead');
+  const displayAddress = isPlaceholderAddress
+    ? 'Location from coordinates / map pin'
+    : rawAddress;
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
@@ -156,7 +162,7 @@ export default function LiveMapScreen() {
         <Text style={styles.mapJobDetailTitle}>
           📍 {job.customerName || job.customer_name || 'Job'}
         </Text>
-        <Text style={styles.mapJobDetailAddress}>{job.address}</Text>
+        <Text style={styles.mapJobDetailAddress}>{displayAddress}</Text>
 
         {jobLat != null && jobLng != null && (
           <Text style={styles.mapJobDetailCoords}>

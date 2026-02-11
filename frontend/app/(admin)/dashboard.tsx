@@ -462,6 +462,26 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#0f172a',
   },
+  reminderCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#e2e8f0',
+    marginBottom: 8,
+  },
+  reminderTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  reminderLine: {
+    fontSize: 13,
+    color: '#111827',
+    fontWeight: '500',
+  },
   reminderRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -488,6 +508,10 @@ const styles = StyleSheet.create({
   reminderSub: {
     fontSize: 11,
     color: '#6b7280',
+  },
+  reminderEmpty: {
+    fontSize: 12,
+    color: '#9ca3af',
   },
   waButton: {
     paddingHorizontal: 10,

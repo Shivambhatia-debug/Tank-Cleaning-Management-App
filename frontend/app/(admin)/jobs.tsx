@@ -17,7 +17,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker } from 'react-native-maps';
-import { decode as decodePlusCode } from 'pluscodes';
+import { decode as decodePlusCode, expand as expandPlusCode } from 'pluscodes';
 import api, { getUploadsBaseUrl } from '../../utils/api';
 import BrandText from '../../components/BrandText';
 
@@ -26,6 +26,19 @@ const DEFAULT_MAP_REGION = {
   longitude: 85.8714,
   latitudeDelta: 0.02,
   longitudeDelta: 0.02,
+};
+
+// Muzaffarpur reference location short Plus Code expand karne ke liye
+const PLUS_CODE_REF = { latitude: 26.1775, longitude: 85.8714 };
+
+const decodeAnyPlusCode = (code: string) => {
+  const raw = (code || '').trim().toUpperCase();
+  if (!raw) {
+    throw new Error('Empty Plus Code');
+  }
+  // Humesha local/short code maan kar Muzaffarpur reference se expand karo
+  const full = expandPlusCode(raw, PLUS_CODE_REF);
+  return decodePlusCode(full);
 };
 
 export default function JobsManagementScreen() {
@@ -157,7 +170,7 @@ export default function JobsManagementScreen() {
       return;
     }
     try {
-      const { latitude, longitude } = decodePlusCode(code);
+      const { latitude, longitude } = decodeAnyPlusCode(code);
       if (
         typeof latitude === 'number' &&
         typeof longitude === 'number' &&

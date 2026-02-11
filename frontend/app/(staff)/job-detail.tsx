@@ -189,6 +189,14 @@ export default function JobDetailScreen() {
     );
   }
 
+  // Saaf label for job location: agar address placeholder hai
+  const rawAddress = String(job.address || '').trim();
+  const isPlaceholderAddress =
+    rawAddress.toLowerCase().startsWith('address from lead');
+  const locationAddress = isPlaceholderAddress
+    ? 'Location from coordinates / map pin'
+    : rawAddress;
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
@@ -231,7 +239,7 @@ export default function JobDetailScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>📍 Job Location (Jahan jana hai)</Text>
           <View style={styles.infoCard}>
-            <Text style={styles.address}>{job.address}</Text>
+            <Text style={styles.address}>{locationAddress}</Text>
             {job.latitude != null && job.longitude != null && (
               <Text style={{ fontSize: 13, color: '#666', marginTop: 6 }}>
                 Coords: {Number(job.latitude).toFixed(5)}, {Number(job.longitude).toFixed(5)}
