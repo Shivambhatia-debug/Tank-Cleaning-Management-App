@@ -4,7 +4,7 @@
     "slug": "tank-cleaning-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/logo.jpeg",
+    "icon": "./assets/water-tank.png",
     "scheme": "tankcleaning",
     "userInterfaceStyle": "automatic",
     "ios": {
@@ -22,8 +22,8 @@
       "package": "com.tankcleaning.app",
       "usesCleartextTraffic": true,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/logo.jpeg",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/water-tank.png",
+        "backgroundColor": "#000000"
       },
       "permissions": [
         "ACCESS_FINE_LOCATION",
@@ -44,7 +44,7 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/logo.jpeg"
+      "favicon": "./assets/water-tank.png"
     },
     "plugins": [
       "expo-router",
