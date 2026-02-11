@@ -408,6 +408,7 @@ const styles = StyleSheet.create({
   },
   iconText: {
     fontSize: isSmallDevice ? 18 : 20,
+    color: '#000',
   },
   statContent: {
     flex: 1,
@@ -540,6 +541,7 @@ const styles = StyleSheet.create({
   },
   actionIconText: {
     fontSize: 20,
+    color: '#000',
   },
   actionContent: {
     flex: 1,

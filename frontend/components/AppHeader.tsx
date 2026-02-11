@@ -69,6 +69,7 @@ const styles = StyleSheet.create({
   },
   titleCompact: {
     fontSize: 15,
+    color: '#1a1a1a',
   },
   subtitle: {
     fontSize: 12,

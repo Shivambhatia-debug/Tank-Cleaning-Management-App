@@ -184,7 +184,7 @@ export default function JobDetailScreen() {
   if (!job) {
     return (
       <View style={styles.container}>
-        <Text>Job not found</Text>
+        <Text style={{ color: '#1a1a1a', fontSize: 16 }}>Job not found</Text>
       </View>
     );
   }

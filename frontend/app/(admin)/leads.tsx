@@ -105,7 +105,10 @@ export default function LeadsScreen() {
   const [creatingJobFromLead, setCreatingJobFromLead] = useState(false);
   const [detailJobStatus, setDetailJobStatus] = useState<(typeof JOB_STATUS_OPTIONS)[number]>('New Lead');
   const [detailPaymentStatus, setDetailPaymentStatus] = useState<(typeof PAYMENT_STATUS_OPTIONS)[number]>('Pending');
-   const [selectedJobStaffIds, setSelectedJobStaffIds] = useState<string[]>([]);
+  const [detailLat, setDetailLat] = useState('');
+  const [detailLng, setDetailLng] = useState('');
+  const [updatingLocation, setUpdatingLocation] = useState(false);
+  const [selectedJobStaffIds, setSelectedJobStaffIds] = useState<string[]>([]);
 
   useEffect(() => {
     loadLeads();
@@ -226,11 +229,45 @@ export default function LeadsScreen() {
       setSelectedLead(res.data);
       setDetailJobStatus((res.data.jobStatus as any) || 'New Lead');
       setDetailPaymentStatus((res.data.paymentStatus as any) || 'Pending');
+      const lat = (res.data as any).latitude;
+      const lng = (res.data as any).longitude;
+      setDetailLat(lat != null && !Number.isNaN(lat) ? String(lat) : '');
+      setDetailLng(lng != null && !Number.isNaN(lng) ? String(lng) : '');
       setSelectedJobStaffIds([]);
       setDetailModalVisible(true);
     } catch (err: any) {
       console.error('Load lead detail error', err.response?.data || err.message);
       Alert.alert('Error', 'Failed to load lead details');
+    }
+  };
+
+  const handleUpdateLeadLocation = async () => {
+    if (!selectedLead) return;
+    const latStr = detailLat.trim();
+    const lngStr = detailLng.trim();
+    if (!latStr || !lngStr) {
+      Alert.alert('Missing', 'Latitude aur Longitude dono bharo');
+      return;
+    }
+    const latNum = Number(latStr);
+    const lngNum = Number(lngStr);
+    if (Number.isNaN(latNum) || Number.isNaN(lngNum)) {
+      Alert.alert('Invalid', 'Sahi number daalo (e.g. 26.1775, 85.8714)');
+      return;
+    }
+    setUpdatingLocation(true);
+    try {
+      const res = await api.put<Lead>(`/leads/${selectedLead._id}`, {
+        latitude: latNum,
+        longitude: lngNum,
+      });
+      setSelectedLead(res.data);
+      Alert.alert('Saved', 'Location update ho gaya. Ab Convert to job pe ye coords use honge.');
+    } catch (err: any) {
+      console.error('Update lead location error', err.response?.data || err.message);
+      Alert.alert('Error', err.response?.data?.message || 'Location update fail');
+    } finally {
+      setUpdatingLocation(false);
     }
   };
 
@@ -794,6 +831,40 @@ export default function LeadsScreen() {
                   <Text style={styles.modalBtnPrimaryText}>Update status</Text>
                 </TouchableOpacity>
 
+                {/* Location (lat/long) for map / convert to job */}
+                <View style={styles.addLogSection}>
+                  <Text style={styles.labelSmall}>📍 Location (job ke liye map coords)</Text>
+                  <Text style={styles.labelSmall}>Latitude</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g. 26.1775"
+                    placeholderTextColor="#9CA3AF"
+                    keyboardType="numeric"
+                    value={detailLat}
+                    onChangeText={setDetailLat}
+                  />
+                  <Text style={styles.labelSmall}>Longitude</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g. 85.8714"
+                    placeholderTextColor="#9CA3AF"
+                    keyboardType="numeric"
+                    value={detailLng}
+                    onChangeText={setDetailLng}
+                  />
+                  <TouchableOpacity
+                    style={[styles.modalBtn, styles.modalBtnPrimary]}
+                    onPress={handleUpdateLeadLocation}
+                    disabled={updatingLocation}
+                  >
+                    {updatingLocation ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <Text style={styles.modalBtnPrimaryText}>Update location</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+
                 {/* Assign staff for job created from this lead */}
                 <View style={styles.addLogSection}>
                   <Text style={styles.labelSmall}>Assign staff for this job</Text>
@@ -1011,6 +1082,7 @@ const styles = StyleSheet.create({
   statusChipText: {
     fontSize: 11,
     fontWeight: '600',
+    color: '#475569',
   },
   leadPhone: {
     fontSize: 13,
@@ -1032,6 +1104,7 @@ const styles = StyleSheet.create({
   },
   leadMetaBold: {
     fontWeight: '600',
+    color: '#374151',
   },
   emptyContainer: {
     alignItems: 'center',
