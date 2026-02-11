@@ -37,6 +37,8 @@ type Lead = {
   area?: string;
   status: string;
   source?: string;
+  latitude?: number;
+  longitude?: number;
   whatsappNumber?: string;
   mapLink?: string;
   serviceType?: string;
@@ -80,6 +82,8 @@ export default function LeadsScreen() {
     whatsappNumber: '',
     address: '',
     area: '',
+    latitude: '',
+    longitude: '',
     mapLink: '',
     serviceType: 'Water Tank',
     tankSizeLtr: '',
@@ -171,6 +175,18 @@ export default function LeadsScreen() {
       if (newLead.paymentMode.trim()) payload.paymentMode = newLead.paymentMode.trim();
       if (newLead.notes.trim()) payload.notes = newLead.notes.trim();
 
+      // Optional manual latitude/longitude for precise map location
+      const latVal = newLead.latitude.trim();
+      const lngVal = newLead.longitude.trim();
+      if (latVal && lngVal) {
+        const latNum = Number(latVal);
+        const lngNum = Number(lngVal);
+        if (!Number.isNaN(latNum) && !Number.isNaN(lngNum)) {
+          payload.latitude = latNum;
+          payload.longitude = lngNum;
+        }
+      }
+
       const res = await api.post<Lead>('/leads', payload);
       setCreateModalVisible(false);
       setNewLead({
@@ -179,6 +195,8 @@ export default function LeadsScreen() {
         whatsappNumber: '',
         address: '',
         area: '',
+        latitude: '',
+        longitude: '',
         mapLink: '',
         serviceType: 'Water Tank',
         tankSizeLtr: '',
@@ -505,6 +523,26 @@ export default function LeadsScreen() {
                 placeholderTextColor="#9CA3AF"
                 value={newLead.area}
                 onChangeText={(t) => setNewLead({ ...newLead, area: t })}
+              />
+
+              <Text style={styles.label}>Latitude (optional)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. 26.1775"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="numeric"
+                value={newLead.latitude}
+                onChangeText={(t) => setNewLead({ ...newLead, latitude: t })}
+              />
+
+              <Text style={styles.label}>Longitude (optional)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. 85.8714"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="numeric"
+                value={newLead.longitude}
+                onChangeText={(t) => setNewLead({ ...newLead, longitude: t })}
               />
 
               <Text style={styles.label}>Map Link (optional)</Text>
