@@ -15,18 +15,45 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AppHeader from '../../components/AppHeader';
+import { decode as decodePlusCode } from 'pluscodes';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../utils/api';
+
+const JOB_STATUS_OPTIONS = [
+  'New Lead',
+  'Confirmed',
+  'Assigned',
+  'In Progress',
+  'Completed',
+  'Cancelled',
+] as const;
+
+const PAYMENT_STATUS_OPTIONS = ['Pending', 'Received'] as const;
 
 type Lead = {
   _id: string;
   customerName: string;
   mobileNumber: string;
   address?: string;
+  area?: string;
   status: string;
   source?: string;
   latitude?: number;
   longitude?: number;
+  whatsappNumber?: string;
+  plusCode?: string;
+  mapLink?: string;
+  serviceType?: string;
+  tankSizeLtr?: number;
+  numberOfTanks?: number;
+  quotedPrice?: number;
+  finalPrice?: number;
+  bookingDate?: string;
+  timeSlot?: string;
+  jobStatus?: (typeof JOB_STATUS_OPTIONS)[number];
+  paymentStatus?: (typeof PAYMENT_STATUS_OPTIONS)[number];
+  paymentMode?: string;
+  notes?: string;
   nextFollowUpAt?: string;
   discussionLogs?: {
     at: string;
@@ -53,13 +80,32 @@ export default function LeadsScreen() {
   const [newLead, setNewLead] = useState({
     customerName: '',
     mobileNumber: '',
+    whatsappNumber: '',
     address: '',
+    area: '',
+    plusCode: '',
+    mapLink: '',
+    serviceType: 'Water Tank',
+    tankSizeLtr: '',
+    numberOfTanks: '',
+    quotedPrice: '',
+    finalPrice: '',
+    bookingDate: '',
+    timeSlot: '',
+    jobStatus: 'New Lead' as (typeof JOB_STATUS_OPTIONS)[number],
+    paymentStatus: 'Pending' as (typeof PAYMENT_STATUS_OPTIONS)[number],
+    paymentMode: 'pending',
+    notes: '',
     source: 'Direct Call',
   });
 
   const [logText, setLogText] = useState('');
   const [logNextDate, setLogNextDate] = useState('');
   const [addingLog, setAddingLog] = useState(false);
+  const [creatingJobFromLead, setCreatingJobFromLead] = useState(false);
+  const [detailPlusCode, setDetailPlusCode] = useState('');
+  const [detailJobStatus, setDetailJobStatus] = useState<(typeof JOB_STATUS_OPTIONS)[number]>('New Lead');
+  const [detailPaymentStatus, setDetailPaymentStatus] = useState<(typeof PAYMENT_STATUS_OPTIONS)[number]>('Pending');
 
   useEffect(() => {
     loadLeads();
@@ -100,14 +146,77 @@ export default function LeadsScreen() {
 
     setCreating(true);
     try {
-      const res = await api.post<Lead>('/leads', {
+      const payload: any = {
         customerName: name,
         mobileNumber: mobile,
         address: newLead.address.trim(),
         source: newLead.source || 'Direct Call',
-      });
+      };
+
+      const wa = newLead.whatsappNumber.replace(/\D/g, '').slice(0, 10);
+      if (wa.length === 10) {
+        payload.whatsappNumber = wa;
+      }
+      if (newLead.area.trim()) payload.area = newLead.area.trim();
+      if (newLead.mapLink.trim()) payload.mapLink = newLead.mapLink.trim();
+      if (newLead.serviceType.trim()) payload.serviceType = newLead.serviceType.trim();
+      if (newLead.tankSizeLtr) payload.tankSizeLtr = Number(newLead.tankSizeLtr) || 0;
+      if (newLead.numberOfTanks) payload.numberOfTanks = Number(newLead.numberOfTanks) || 0;
+      if (newLead.quotedPrice) payload.quotedPrice = Number(newLead.quotedPrice) || 0;
+      if (newLead.finalPrice) payload.finalPrice = Number(newLead.finalPrice) || 0;
+      if (newLead.bookingDate.trim()) payload.bookingDate = newLead.bookingDate.trim();
+      if (newLead.timeSlot.trim()) payload.timeSlot = newLead.timeSlot.trim();
+      if (newLead.jobStatus) payload.jobStatus = newLead.jobStatus;
+      if (newLead.paymentStatus) payload.paymentStatus = newLead.paymentStatus;
+      if (newLead.paymentMode.trim()) payload.paymentMode = newLead.paymentMode.trim();
+      if (newLead.notes.trim()) payload.notes = newLead.notes.trim();
+
+      if (newLead.plusCode.trim()) {
+        try {
+          const { latitude, longitude } = decodePlusCode(newLead.plusCode.trim());
+          if (
+            typeof latitude === 'number' &&
+            typeof longitude === 'number' &&
+            !Number.isNaN(latitude) &&
+            !Number.isNaN(longitude)
+          ) {
+            payload.latitude = latitude;
+            payload.longitude = longitude;
+            payload.plusCode = newLead.plusCode.trim();
+          } else {
+            Alert.alert('Invalid Plus Code', 'Plus Code sahi nahi hai, dubara check karein.');
+            setCreating(false);
+            return;
+          }
+        } catch {
+          Alert.alert('Invalid Plus Code', 'Plus Code sahi nahi hai, dubara check karein.');
+          setCreating(false);
+          return;
+        }
+      }
+
+      const res = await api.post<Lead>('/leads', payload);
       setCreateModalVisible(false);
-      setNewLead({ customerName: '', mobileNumber: '', address: '', source: 'Direct Call' });
+      setNewLead({
+        customerName: '',
+        mobileNumber: '',
+        whatsappNumber: '',
+        address: '',
+        area: '',
+        plusCode: '',
+        mapLink: '',
+        serviceType: 'Water Tank',
+        tankSizeLtr: '',
+        numberOfTanks: '',
+        quotedPrice: '',
+        finalPrice: '',
+        bookingDate: '',
+        timeSlot: '',
+        paymentStatus: 'pending',
+        paymentMode: 'pending',
+        notes: '',
+        source: 'Direct Call',
+      });
       // Prepend new lead to list so admin sees it immediately
       setLeads((prev) => [res.data, ...prev]);
     } catch (err: any) {
@@ -122,10 +231,27 @@ export default function LeadsScreen() {
     try {
       const res = await api.get<Lead>(`/leads/${lead._id}`);
       setSelectedLead(res.data);
+      setDetailJobStatus((res.data.jobStatus as any) || 'New Lead');
+      setDetailPaymentStatus((res.data.paymentStatus as any) || 'Pending');
       setDetailModalVisible(true);
     } catch (err: any) {
       console.error('Load lead detail error', err.response?.data || err.message);
       Alert.alert('Error', 'Failed to load lead details');
+    }
+  };
+
+  const handleUpdateLeadStatus = async () => {
+    if (!selectedLead) return;
+    try {
+      await api.put<Lead>(`/leads/${selectedLead._id}`, {
+        jobStatus: detailJobStatus,
+        paymentStatus: detailPaymentStatus,
+      });
+      Alert.alert('Updated', 'Lead status updated');
+      loadLeads();
+    } catch (err: any) {
+      console.error('Update lead status error', err.response?.data || err.message);
+      Alert.alert('Error', err.response?.data?.message || 'Failed to update lead status');
     }
   };
 
@@ -152,6 +278,42 @@ export default function LeadsScreen() {
     }
   };
 
+  const handleCreateJobFromLead = async () => {
+    if (!selectedLead) return;
+    setCreatingJobFromLead(true);
+    try {
+      // Default fallback location (same as Jobs screen)
+      const DEFAULT_LAT = 26.1775;
+      const DEFAULT_LNG = 85.8714;
+
+      const payload: any = {
+        customerName: selectedLead.customerName,
+        mobileNumber: selectedLead.mobileNumber,
+        address: selectedLead.address || '',
+        tankSize: '500L',
+        serviceType: 'Water Tank',
+        leadSource: selectedLead.source || 'Lead',
+        serviceCharge: 0,
+        paymentMode: 'pending',
+        assignedStaff: [],
+        notes: `Job created from lead ${selectedLead._id}`,
+      };
+      const lat = selectedLead.latitude ?? DEFAULT_LAT;
+      const lng = selectedLead.longitude ?? DEFAULT_LNG;
+      payload.latitude = lat;
+      payload.longitude = lng;
+      payload.targetLatitude = lat;
+      payload.targetLongitude = lng;
+      await api.post('/jobs', payload);
+      Alert.alert('Done', 'Job created from this lead. Go to Jobs tab to assign staff & schedule.');
+    } catch (err: any) {
+      console.error('Create job from lead error', err.response?.data || err.message);
+      Alert.alert('Error', err.response?.data?.message || 'Failed to create job from lead');
+    } finally {
+      setCreatingJobFromLead(false);
+    }
+  };
+
   const filteredLeads =
     filterStatus === 'All' ? leads : leads.filter((l) => l.status === filterStatus);
 
@@ -170,9 +332,21 @@ export default function LeadsScreen() {
       <Text style={styles.leadPhone}>📱 {item.mobileNumber}</Text>
       {item.address ? <Text style={styles.leadAddress}>📍 {item.address}</Text> : null}
       <View style={styles.leadMetaRow}>
-        <Text style={styles.leadMeta}>
-          Source: <Text style={styles.leadMetaBold}>{item.source || 'Direct Call'}</Text>
-        </Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.leadMeta}>
+            Source: <Text style={styles.leadMetaBold}>{item.source || 'Direct Call'}</Text>
+          </Text>
+          {item.jobStatus && (
+            <Text style={styles.leadMeta}>
+              Job: <Text style={styles.leadMetaBold}>{item.jobStatus}</Text>
+            </Text>
+          )}
+          {item.paymentStatus && (
+            <Text style={styles.leadMeta}>
+              Payment: <Text style={styles.leadMetaBold}>{item.paymentStatus}</Text>
+            </Text>
+          )}
+        </View>
         {item.nextFollowUpAt && (
           <Text style={styles.leadMeta}>
             Next: {new Date(item.nextFollowUpAt).toLocaleDateString()}
@@ -270,69 +444,237 @@ export default function LeadsScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>New lead</Text>
+            <ScrollView
+              style={{ maxHeight: 480 }}
+              showsVerticalScrollIndicator={false}
+            >
+              <Text style={styles.label}>Customer name *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Full name"
+                placeholderTextColor="#9CA3AF"
+                value={newLead.customerName}
+                onChangeText={(t) => setNewLead({ ...newLead, customerName: t })}
+              />
 
-            <Text style={styles.label}>Customer name *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Full name"
-              placeholderTextColor="#9CA3AF"
-              value={newLead.customerName}
-              onChangeText={(t) => setNewLead({ ...newLead, customerName: t })}
-            />
+              <Text style={styles.label}>Mobile *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="10 digit mobile"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="phone-pad"
+                maxLength={10}
+                value={newLead.mobileNumber}
+                onChangeText={(t) =>
+                  setNewLead({ ...newLead, mobileNumber: t.replace(/\D/g, '').slice(0, 10) })
+                }
+              />
 
-            <Text style={styles.label}>Mobile *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="10 digit mobile"
-              placeholderTextColor="#9CA3AF"
-              keyboardType="phone-pad"
-              maxLength={10}
-              value={newLead.mobileNumber}
-              onChangeText={(t) =>
-                setNewLead({ ...newLead, mobileNumber: t.replace(/\D/g, '').slice(0, 10) })
-              }
-            />
+              <Text style={styles.label}>Address</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                placeholder="Area / landmark"
+                placeholderTextColor="#9CA3AF"
+                multiline
+                numberOfLines={2}
+                value={newLead.address}
+                onChangeText={(t) => setNewLead({ ...newLead, address: t })}
+              />
 
-            <Text style={styles.label}>Address</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Area / landmark"
-              placeholderTextColor="#9CA3AF"
-              multiline
-              numberOfLines={2}
-              value={newLead.address}
-              onChangeText={(t) => setNewLead({ ...newLead, address: t })}
-            />
+              <Text style={styles.label}>Source</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Facebook / WhatsApp / Call"
+                placeholderTextColor="#9CA3AF"
+                value={newLead.source}
+                onChangeText={(t) => setNewLead({ ...newLead, source: t })}
+              />
 
-            <Text style={styles.label}>Source</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Facebook / WhatsApp / Call"
-              placeholderTextColor="#9CA3AF"
-              value={newLead.source}
-              onChangeText={(t) => setNewLead({ ...newLead, source: t })}
-            />
+              <Text style={styles.label}>WhatsApp (optional)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="10 digit WhatsApp number"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="phone-pad"
+                maxLength={10}
+                value={newLead.whatsappNumber}
+                onChangeText={(t) =>
+                  setNewLead({
+                    ...newLead,
+                    whatsappNumber: t.replace(/\D/g, '').slice(0, 10),
+                  })
+                }
+              />
 
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalBtn, styles.modalBtnCancel]}
-                onPress={() => setCreateModalVisible(false)}
-              >
-                <Text style={styles.modalBtnCancelText}>Cancel</Text>
-              </TouchableOpacity>
+              <Text style={styles.label}>Area / Locality</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. Labagh / Mithanpura"
+                placeholderTextColor="#9CA3AF"
+                value={newLead.area}
+                onChangeText={(t) => setNewLead({ ...newLead, area: t })}
+              />
 
-              <TouchableOpacity
-                style={[styles.modalBtn, styles.modalBtnPrimary]}
-                onPress={handleCreateLead}
-                disabled={creating}
-              >
-                {creating ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.modalBtnPrimaryText}>Save</Text>
-                )}
-              </TouchableOpacity>
-            </View>
+              <Text style={styles.label}>Google Plus Code</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. 7JVW8Q5C+P3"
+                placeholderTextColor="#9CA3AF"
+                autoCapitalize="characters"
+                value={newLead.plusCode}
+                onChangeText={(t) => setNewLead({ ...newLead, plusCode: t })}
+              />
+
+              <Text style={styles.label}>Map Link (optional)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Google Maps URL"
+                placeholderTextColor="#9CA3AF"
+                value={newLead.mapLink}
+                onChangeText={(t) => setNewLead({ ...newLead, mapLink: t })}
+              />
+
+              <View style={styles.row2}>
+                <View style={styles.col2}>
+                  <Text style={styles.label}>Service Type</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g. Water Tank"
+                    placeholderTextColor="#9CA3AF"
+                    value={newLead.serviceType}
+                    onChangeText={(t) => setNewLead({ ...newLead, serviceType: t })}
+                  />
+                </View>
+                <View style={styles.spacer2} />
+                <View style={styles.col2}>
+                  <Text style={styles.label}>Tank Size (Ltr)</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g. 1000"
+                    placeholderTextColor="#9CA3AF"
+                    keyboardType="numeric"
+                    value={newLead.tankSizeLtr}
+                    onChangeText={(t) => setNewLead({ ...newLead, tankSizeLtr: t })}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.row2}>
+                <View style={styles.col2}>
+                  <Text style={styles.label}>No of Tank</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g. 2"
+                    placeholderTextColor="#9CA3AF"
+                    keyboardType="numeric"
+                    value={newLead.numberOfTanks}
+                    onChangeText={(t) => setNewLead({ ...newLead, numberOfTanks: t })}
+                  />
+                </View>
+                <View style={styles.spacer2} />
+                <View style={styles.col2}>
+                  <Text style={styles.label}>Quoted Price (₹)</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g. 800"
+                    placeholderTextColor="#9CA3AF"
+                    keyboardType="numeric"
+                    value={newLead.quotedPrice}
+                    onChangeText={(t) => setNewLead({ ...newLead, quotedPrice: t })}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.row2}>
+                <View style={styles.col2}>
+                  <Text style={styles.label}>Final Price (₹)</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g. 700"
+                    placeholderTextColor="#9CA3AF"
+                    keyboardType="numeric"
+                    value={newLead.finalPrice}
+                    onChangeText={(t) => setNewLead({ ...newLead, finalPrice: t })}
+                  />
+                </View>
+                <View style={styles.spacer2} />
+                <View style={styles.col2}>
+                  <Text style={styles.label}>Booking Date (optional)</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g. 2026-02-20"
+                    placeholderTextColor="#9CA3AF"
+                    value={newLead.bookingDate}
+                    onChangeText={(t) => setNewLead({ ...newLead, bookingDate: t })}
+                  />
+                </View>
+              </View>
+
+              <Text style={styles.label}>Time Slot (optional)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. 10:00 AM – 12:00 PM"
+                placeholderTextColor="#9CA3AF"
+                value={newLead.timeSlot}
+                onChangeText={(t) => setNewLead({ ...newLead, timeSlot: t })}
+              />
+
+              <View style={styles.row2}>
+                <View style={styles.col2}>
+                  <Text style={styles.label}>Payment Status</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="pending / paid"
+                    placeholderTextColor="#9CA3AF"
+                    value={newLead.paymentStatus}
+                    onChangeText={(t) => setNewLead({ ...newLead, paymentStatus: t })}
+                  />
+                </View>
+                <View style={styles.spacer2} />
+                <View style={styles.col2}>
+                  <Text style={styles.label}>Payment Mode</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="cash / upi / online"
+                    placeholderTextColor="#9CA3AF"
+                    value={newLead.paymentMode}
+                    onChangeText={(t) => setNewLead({ ...newLead, paymentMode: t })}
+                  />
+                </View>
+              </View>
+
+              <Text style={styles.label}>Notes</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                placeholder="Short note for this enquiry"
+                placeholderTextColor="#9CA3AF"
+                multiline
+                numberOfLines={2}
+                value={newLead.notes}
+                onChangeText={(t) => setNewLead({ ...newLead, notes: t })}
+              />
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalBtn, styles.modalBtnCancel]}
+                  onPress={() => setCreateModalVisible(false)}
+                >
+                  <Text style={styles.modalBtnCancelText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.modalBtn, styles.modalBtnPrimary]}
+                  onPress={handleCreateLead}
+                  disabled={creating}
+                >
+                  {creating ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.modalBtnPrimaryText}>Save</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -347,7 +689,10 @@ export default function LeadsScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, { maxHeight: '90%' }]}>
             {selectedLead ? (
-              <>
+              <ScrollView
+                style={{ maxHeight: 520 }}
+                showsVerticalScrollIndicator={false}
+              >
                 <Text style={styles.modalTitle}>{selectedLead.customerName}</Text>
                 <Text style={styles.detailLine}>📱 {selectedLead.mobileNumber}</Text>
                 {selectedLead.address ? (
@@ -359,12 +704,75 @@ export default function LeadsScreen() {
                 <Text style={styles.detailLine}>
                   Status: <Text style={styles.leadMetaBold}>{selectedLead.status}</Text>
                 </Text>
+                <Text style={styles.detailLine}>
+                  Job status:{' '}
+                  <Text style={styles.leadMetaBold}>{detailJobStatus}</Text>
+                </Text>
+                <Text style={styles.detailLine}>
+                  Payment status:{' '}
+                  <Text style={styles.leadMetaBold}>{detailPaymentStatus}</Text>
+                </Text>
                 {selectedLead.nextFollowUpAt && (
                   <Text style={styles.detailLine}>
                     Next follow‑up:{' '}
                     {new Date(selectedLead.nextFollowUpAt).toLocaleString()}
                   </Text>
                 )}
+
+                <View style={styles.statusPillsRow}>
+                  {JOB_STATUS_OPTIONS.map((st) => {
+                    const active = detailJobStatus === st;
+                    return (
+                      <TouchableOpacity
+                        key={st}
+                        style={[
+                          styles.statusPill,
+                          active && styles.statusPillActive,
+                        ]}
+                        onPress={() => setDetailJobStatus(st)}
+                      >
+                        <Text
+                          style={[
+                            styles.statusPillText,
+                            active && styles.statusPillTextActive,
+                          ]}
+                        >
+                          {st}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                <View style={styles.statusPillsRow}>
+                  {PAYMENT_STATUS_OPTIONS.map((st) => {
+                    const active = detailPaymentStatus === st;
+                    return (
+                      <TouchableOpacity
+                        key={st}
+                        style={[
+                          styles.statusPill,
+                          active && styles.statusPillActive,
+                        ]}
+                        onPress={() => setDetailPaymentStatus(st)}
+                      >
+                        <Text
+                          style={[
+                            styles.statusPillText,
+                            active && styles.statusPillTextActive,
+                          ]}
+                        >
+                          {st}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                <TouchableOpacity
+                  style={[styles.modalBtn, styles.modalBtnPrimary, { marginTop: 4 }]}
+                  onPress={handleUpdateLeadStatus}
+                >
+                  <Text style={styles.modalBtnPrimaryText}>Update status</Text>
+                </TouchableOpacity>
 
                 <View style={styles.logsSection}>
                   <Text style={styles.logsTitle}>Conversation log</Text>
@@ -411,6 +819,46 @@ export default function LeadsScreen() {
                     value={logNextDate}
                     onChangeText={setLogNextDate}
                   />
+
+                  <Text style={[styles.labelSmall, { marginTop: 6 }]}>
+                    Google Plus Code (optional, accurate location ke liye)
+                  </Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g. 7JVW8Q5C+P3"
+                    placeholderTextColor="#9CA3AF"
+                    value={detailPlusCode}
+                    autoCapitalize="characters"
+                    onChangeText={setDetailPlusCode}
+                    onEndEditing={() => {
+                      const code = detailPlusCode.trim();
+                      if (!code) return;
+                      try {
+                        const { latitude, longitude } = decodePlusCode(code);
+                        if (
+                          typeof latitude === 'number' &&
+                          typeof longitude === 'number' &&
+                          !Number.isNaN(latitude) &&
+                          !Number.isNaN(longitude)
+                        ) {
+                          setSelectedLead({
+                            ...selectedLead,
+                            latitude,
+                            longitude,
+                          });
+                          Alert.alert(
+                            'Location set',
+                            'Plus Code se job location set ho gaya. Ab "Convert to job" dabayen.'
+                          );
+                        } else {
+                          Alert.alert('Invalid Plus Code', 'Plus Code sahi nahi hai, dubara check karein.');
+                        }
+                      } catch (e) {
+                        Alert.alert('Invalid Plus Code', 'Plus Code sahi nahi hai, dubara check karein.');
+                      }
+                    }}
+                  />
+
                   <TouchableOpacity
                     style={[styles.modalBtn, styles.modalBtnPrimary]}
                     onPress={handleAddLog}
@@ -422,8 +870,19 @@ export default function LeadsScreen() {
                       <Text style={styles.modalBtnPrimaryText}>Save log</Text>
                     )}
                   </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalBtn, styles.convertBtn]}
+                    onPress={handleCreateJobFromLead}
+                    disabled={creatingJobFromLead}
+                  >
+                    {creatingJobFromLead ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <Text style={styles.convertBtnText}>✅ Convert to job</Text>
+                    )}
+                  </TouchableOpacity>
                 </View>
-              </>
+              </ScrollView>
             ) : (
               <ActivityIndicator size="large" color="#007AFF" />
             )}
@@ -603,6 +1062,16 @@ const styles = StyleSheet.create({
     minHeight: 60,
     textAlignVertical: 'top',
   },
+  row2: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  col2: {
+    flex: 1,
+  },
+  spacer2: {
+    width: 10,
+  },
   modalButtons: {
     flexDirection: 'row',
     gap: 10,
@@ -610,12 +1079,15 @@ const styles = StyleSheet.create({
   },
   modalBtn: {
     flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
+    paddingVertical: 12,
+    borderRadius: 999,
     alignItems: 'center',
+    marginTop: 4,
   },
   modalBtnCancel: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   modalBtnCancelText: {
     color: '#111827',
@@ -623,12 +1095,23 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   modalBtnPrimary: {
-    backgroundColor: '#0EA5E9',
+    backgroundColor: '#0284c7',
   },
   modalBtnPrimaryText: {
     color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  convertBtn: {
+    backgroundColor: '#16a34a',
+    borderWidth: 0,
+    borderColor: 'transparent',
+    marginTop: 10,
+  },
+  convertBtnText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '700',
   },
   detailLine: {
     fontSize: 13,
@@ -670,6 +1153,33 @@ const styles = StyleSheet.create({
   },
   addLogSection: {
     marginTop: 10,
+  },
+  statusPillsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 4,
+  },
+  statusPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    backgroundColor: '#f9fafb',
+  },
+  statusPillActive: {
+    borderColor: '#0ea5e9',
+    backgroundColor: '#e0f2fe',
+  },
+  statusPillText: {
+    fontSize: 11,
+    color: '#475569',
+    fontWeight: '500',
+  },
+  statusPillTextActive: {
+    color: '#0369a1',
+    fontWeight: '600',
   },
 });
 

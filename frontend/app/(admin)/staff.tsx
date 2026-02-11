@@ -10,10 +10,14 @@ import {
   TextInput,
   Modal,
   Alert,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import api from '../../utils/api';
 import BrandText from '../../components/BrandText';
+
+const STAFF_TYPE_OPTIONS = ['Full Time', 'Part Time'] as const;
+const STAFF_STATUS_OPTIONS = ['Active', 'Inactive', 'Terminated'] as const;
 
 export default function StaffManagementScreen() {
   const [staff, setStaff] = useState<any[]>([]);
@@ -22,7 +26,22 @@ export default function StaffManagementScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState<any>(null);
-  const [newStaff, setNewStaff] = useState({ name: '', phone: '', password: '', businessName: '', location: '' });
+  const [newStaff, setNewStaff] = useState({
+    name: '',
+    phone: '',
+    password: '',
+    businessName: '',
+    location: '',
+    staffCode: '',
+    staffType: 'Full Time' as (typeof STAFF_TYPE_OPTIONS)[number],
+    fixedSalary: '',
+    perTankIncentive: '',
+    hasBike: false,
+    fuelAllowance: '',
+    joiningDate: '',
+    employmentStatus: 'Active' as (typeof STAFF_STATUS_OPTIONS)[number],
+    remarks: '',
+  });
   const [addingStaff, setAddingStaff] = useState(false);
   const [staffStats, setStaffStats] = useState<any | null>(null);
   const [loadingStats, setLoadingStats] = useState(false);
@@ -65,13 +84,37 @@ export default function StaffManagementScreen() {
         role: 'staff',
         businessName: newStaff.businessName.trim(),
         location: newStaff.location.trim(),
+        staffCode: newStaff.staffCode.trim() || undefined,
+        staffType: newStaff.staffType,
+        fixedSalary: newStaff.fixedSalary ? Number(newStaff.fixedSalary) || 0 : undefined,
+        perTankIncentive: newStaff.perTankIncentive ? Number(newStaff.perTankIncentive) || 0 : undefined,
+        hasBike: newStaff.hasBike,
+        fuelAllowance: newStaff.fuelAllowance ? Number(newStaff.fuelAllowance) || 0 : undefined,
+        joiningDate: newStaff.joiningDate || undefined,
+        employmentStatus: newStaff.employmentStatus,
+        remarks: newStaff.remarks.trim() || undefined,
       });
       Alert.alert(
         'Staff added',
         `Share this password with them: ${newStaff.password}\n\n(Note it down; it won't be shown again.)`
       );
       setModalVisible(false);
-      setNewStaff({ name: '', phone: '', password: '', businessName: '', location: '' });
+      setNewStaff({
+        name: '',
+        phone: '',
+        password: '',
+        businessName: '',
+        location: '',
+        staffCode: '',
+        staffType: 'Full Time',
+        fixedSalary: '',
+        perTankIncentive: '',
+        hasBike: false,
+        fuelAllowance: '',
+        joiningDate: '',
+        employmentStatus: 'Active',
+        remarks: '',
+      });
       loadStaff();
     } catch (error: any) {
       Alert.alert('Error', error.response?.data?.detail || 'Failed to add staff');
@@ -195,72 +238,201 @@ export default function StaffManagementScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Add New Staff</Text>
+            <ScrollView style={{ maxHeight: 480 }} showsVerticalScrollIndicator={false}>
+              <TextInput
+                style={styles.input}
+                placeholder="Staff Name"
+                placeholderTextColor="#9CA3AF"
+                value={newStaff.name}
+                onChangeText={(text) => setNewStaff({ ...newStaff, name: text })}
+              />
 
-            <TextInput
-              style={styles.input}
-              placeholder="Staff Name"
-              placeholderTextColor="#9CA3AF"
-              value={newStaff.name}
-              onChangeText={(text) => setNewStaff({ ...newStaff, name: text })}
-            />
+              <TextInput
+                style={styles.input}
+                placeholder="Phone (10 digits only)"
+                placeholderTextColor="#9CA3AF"
+                value={newStaff.phone}
+                onChangeText={(t) => setNewStaff({ ...newStaff, phone: t.replace(/\D/g, '').slice(0, 10) })}
+                keyboardType="phone-pad"
+                maxLength={10}
+              />
 
-            <TextInput
-              style={styles.input}
-              placeholder="Phone (10 digits only)"
-              placeholderTextColor="#9CA3AF"
-              value={newStaff.phone}
-              onChangeText={(t) => setNewStaff({ ...newStaff, phone: t.replace(/\D/g, '').slice(0, 10) })}
-              keyboardType="phone-pad"
-              maxLength={10}
-            />
+              <TextInput
+                style={styles.input}
+                placeholder="Password"
+                placeholderTextColor="#9CA3AF"
+                value={newStaff.password}
+                onChangeText={(text) => setNewStaff({ ...newStaff, password: text })}
+                secureTextEntry
+              />
 
-            <TextInput
-              style={styles.input}
-              placeholder="Password"
-              placeholderTextColor="#9CA3AF"
-              value={newStaff.password}
-              onChangeText={(text) => setNewStaff({ ...newStaff, password: text })}
-              secureTextEntry
-            />
+              <TextInput
+                style={styles.input}
+                placeholder="Staff ID (optional)"
+                placeholderTextColor="#9CA3AF"
+                value={newStaff.staffCode}
+                onChangeText={(text) => setNewStaff({ ...newStaff, staffCode: text })}
+              />
 
-            <TextInput
-              style={styles.input}
-              placeholder="Business name"
-              placeholderTextColor="#9CA3AF"
-              value={newStaff.businessName}
-              onChangeText={(t) => setNewStaff({ ...newStaff, businessName: t })}
-            />
+              <View style={styles.row}>
+                <View style={styles.col}>
+                  <Text style={styles.label}>Staff Type</Text>
+                  <View style={styles.chipRow}>
+                    {STAFF_TYPE_OPTIONS.map((type) => {
+                      const active = newStaff.staffType === type;
+                      return (
+                        <TouchableOpacity
+                          key={type}
+                          style={[styles.chip, active && styles.chipActive]}
+                          onPress={() => setNewStaff({ ...newStaff, staffType: type })}
+                        >
+                          <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                            {type}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              </View>
 
-            <TextInput
-              style={[styles.input, styles.inputArea]}
-              placeholder="Location / Address (kahan rehte hain)"
-              placeholderTextColor="#9CA3AF"
-              value={newStaff.location}
-              onChangeText={(t) => setNewStaff({ ...newStaff, location: t })}
-              multiline
-              numberOfLines={2}
-            />
+              <View style={styles.row}>
+                <View style={styles.col}>
+                  <Text style={styles.label}>Fixed Salary (₹)</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g. 12000"
+                    placeholderTextColor="#9CA3AF"
+                    keyboardType="numeric"
+                    value={newStaff.fixedSalary}
+                    onChangeText={(t) => setNewStaff({ ...newStaff, fixedSalary: t })}
+                  />
+                </View>
+                <View style={{ width: 10 }} />
+                <View style={styles.col}>
+                  <Text style={styles.label}>Per Tank Incentive (₹)</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g. 20"
+                    placeholderTextColor="#9CA3AF"
+                    keyboardType="numeric"
+                    value={newStaff.perTankIncentive}
+                    onChangeText={(t) => setNewStaff({ ...newStaff, perTankIncentive: t })}
+                  />
+                </View>
+              </View>
 
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setModalVisible(false)}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
+              <View style={styles.row}>
+                <View style={styles.col}>
+                  <Text style={styles.label}>Bike</Text>
+                  <View style={styles.chipRow}>
+                    {['Yes', 'No'].map((opt) => {
+                      const yes = opt === 'Yes';
+                      const active = newStaff.hasBike === yes;
+                      return (
+                        <TouchableOpacity
+                          key={opt}
+                          style={[styles.chip, active && styles.chipActive]}
+                          onPress={() => setNewStaff({ ...newStaff, hasBike: yes })}
+                        >
+                          <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                            {opt}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+                <View style={{ width: 10 }} />
+                <View style={styles.col}>
+                  <Text style={styles.label}>Fuel Allowance (₹)</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g. 1500"
+                    placeholderTextColor="#9CA3AF"
+                    keyboardType="numeric"
+                    value={newStaff.fuelAllowance}
+                    onChangeText={(t) => setNewStaff({ ...newStaff, fuelAllowance: t })}
+                  />
+                </View>
+              </View>
 
-              <TouchableOpacity
-                style={[styles.modalButton, styles.submitButton]}
-                onPress={handleAddStaff}
-                disabled={addingStaff}
-              >
-                {addingStaff ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.submitButtonText}>Add Staff</Text>
-                )}
-              </TouchableOpacity>
-            </View>
+              <Text style={styles.label}>Joining Date (optional)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. 2026-02-11"
+                placeholderTextColor="#9CA3AF"
+                value={newStaff.joiningDate}
+                onChangeText={(t) => setNewStaff({ ...newStaff, joiningDate: t })}
+              />
+
+              <Text style={styles.label}>Status</Text>
+              <View style={styles.chipRow}>
+                {STAFF_STATUS_OPTIONS.map((st) => {
+                  const active = newStaff.employmentStatus === st;
+                  return (
+                    <TouchableOpacity
+                      key={st}
+                      style={[styles.chip, active && styles.chipActive]}
+                      onPress={() => setNewStaff({ ...newStaff, employmentStatus: st })}
+                    >
+                      <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                        {st}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <TextInput
+                style={styles.input}
+                placeholder="Business name"
+                placeholderTextColor="#9CA3AF"
+                value={newStaff.businessName}
+                onChangeText={(t) => setNewStaff({ ...newStaff, businessName: t })}
+              />
+
+              <TextInput
+                style={[styles.input, styles.inputArea]}
+                placeholder="Location / Address (kahan rehte hain)"
+                placeholderTextColor="#9CA3AF"
+                value={newStaff.location}
+                onChangeText={(t) => setNewStaff({ ...newStaff, location: t })}
+                multiline
+                numberOfLines={2}
+              />
+
+              <TextInput
+                style={[styles.input, styles.inputArea]}
+                placeholder="Remarks (optional)"
+                placeholderTextColor="#9CA3AF"
+                value={newStaff.remarks}
+                onChangeText={(t) => setNewStaff({ ...newStaff, remarks: t })}
+                multiline
+                numberOfLines={2}
+              />
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.cancelButton]}
+                  onPress={() => setModalVisible(false)}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.submitButton]}
+                  onPress={handleAddStaff}
+                  disabled={addingStaff}
+                >
+                  {addingStaff ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.submitButtonText}>Add Staff</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -466,6 +638,46 @@ const styles = StyleSheet.create({
   inputArea: {
     minHeight: 56,
     textAlignVertical: 'top',
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  col: {
+    flex: 1,
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 4,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 8,
+  },
+  chip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    backgroundColor: '#f9fafb',
+  },
+  chipActive: {
+    borderColor: '#0ea5e9',
+    backgroundColor: '#e0f2fe',
+  },
+  chipText: {
+    fontSize: 11,
+    color: '#475569',
+    fontWeight: '500',
+  },
+  chipTextActive: {
+    color: '#0369a1',
+    fontWeight: '600',
   },
   modalButtons: {
     flexDirection: 'row',

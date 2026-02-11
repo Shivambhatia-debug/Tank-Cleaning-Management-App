@@ -38,6 +38,10 @@ const leadSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    area: {
+      type: String,
+      trim: true,
+    },
     latitude: {
       type: Number,
     },
@@ -48,6 +52,63 @@ const leadSchema = new mongoose.Schema(
       type: String,
       enum: ['Facebook', 'Instagram', 'WhatsApp', 'Direct Call', 'Other'],
       default: 'Direct Call',
+    },
+    whatsappNumber: {
+      type: String,
+      trim: true,
+    },
+    plusCode: {
+      type: String,
+      trim: true,
+    },
+    mapLink: {
+      type: String,
+      trim: true,
+    },
+    serviceType: {
+      type: String,
+      trim: true,
+    },
+    tankSizeLtr: {
+      type: Number,
+    },
+    numberOfTanks: {
+      type: Number,
+    },
+    quotedPrice: {
+      type: Number,
+    },
+    finalPrice: {
+      type: Number,
+    },
+    bookingDate: {
+      type: Date,
+    },
+    timeSlot: {
+      type: String,
+      trim: true,
+    },
+    assignedStaff: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    ],
+    jobStatus: {
+      type: String,
+      trim: true,
+    },
+    paymentStatus: {
+      type: String,
+      trim: true,
+    },
+    paymentMode: {
+      type: String,
+      trim: true,
+    },
+    notes: {
+      type: String,
+      trim: true,
     },
     status: {
       type: String,

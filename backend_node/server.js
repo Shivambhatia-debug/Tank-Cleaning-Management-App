@@ -11,6 +11,7 @@ const User = require('./models/User');
 const Job = require('./models/Job');
 const Location = require('./models/Location');
 const Lead = require('./models/Lead');
+const Expense = require('./models/Expense');
 
 const app = express();
 // On Vercel (serverless) we don't create HTTP server or Socket.io - they cause crash
@@ -145,11 +146,26 @@ app.post('/api/auth/login', async (req, res) => {
 app.post('/api/users/staff', auth, async (req, res) => {
     if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
     try {
-        const { phone, password, name, businessName, location } = req.body;
+        const {
+            phone,
+            password,
+            name,
+            businessName,
+            location,
+            staffCode,
+            staffType,
+            fixedSalary,
+            perTankIncentive,
+            hasBike,
+            fuelAllowance,
+            joiningDate,
+            employmentStatus,
+            remarks,
+        } = req.body;
         const existing = await User.findOne({ phone: String(phone).replace(/\D/g, '').slice(0, 10) });
         if (existing) return res.status(400).json({ message: 'Phone already exists' });
 
-        const staff = new User({
+        const staffData = {
             phone: String(phone).replace(/\D/g, '').slice(0, 10),
             password,
             name,
@@ -157,7 +173,24 @@ app.post('/api/users/staff', auth, async (req, res) => {
             businessName: businessName || '',
             location: location || '',
             plainPasswordForAdmin: password || ''
-        });
+        };
+
+        if (staffCode) staffData.staffCode = String(staffCode).trim();
+        if (staffType && ['Full Time', 'Part Time'].includes(staffType)) {
+            staffData.staffType = staffType;
+        }
+        if (fixedSalary != null) staffData.fixedSalary = Number(fixedSalary) || 0;
+        if (perTankIncentive != null) staffData.perTankIncentive = Number(perTankIncentive) || 0;
+        if (typeof hasBike === 'boolean') staffData.hasBike = hasBike;
+        if (fuelAllowance != null) staffData.fuelAllowance = Number(fuelAllowance) || 0;
+        if (joiningDate) staffData.joiningDate = new Date(joiningDate);
+        if (employmentStatus && ['Active', 'Inactive', 'Terminated'].includes(employmentStatus)) {
+            staffData.employmentStatus = employmentStatus;
+            staffData.isActive = employmentStatus === 'Active';
+        }
+        if (remarks) staffData.remarks = String(remarks).trim();
+
+        const staff = new User(staffData);
         await staff.save();
         res.status(201).json({ message: 'Staff created successfully' });
     } catch (err) {
@@ -180,6 +213,22 @@ app.post('/api/leads', auth, async (req, res) => {
             source,
             status,
             tags,
+            area,
+            whatsappNumber,
+            plusCode,
+            mapLink,
+            serviceType,
+            tankSizeLtr,
+            numberOfTanks,
+            quotedPrice,
+            finalPrice,
+            bookingDate,
+            timeSlot,
+            assignedStaff,
+            jobStatus,
+            paymentStatus,
+            paymentMode,
+            notes,
         } = req.body;
 
         if (!customerName || !mobileNumber) {
@@ -191,7 +240,7 @@ app.post('/api/leads', auth, async (req, res) => {
             return res.status(400).json({ message: 'Enter valid 10 digit mobile number' });
         }
 
-        const lead = new Lead({
+        const leadData = {
             customerName: customerName.trim(),
             mobileNumber: mobileDigits,
             address: (address || '').trim(),
@@ -201,7 +250,29 @@ app.post('/api/leads', auth, async (req, res) => {
             status: status || 'New',
             tags: Array.isArray(tags) ? tags : [],
             createdBy: req.user.id,
-        });
+        };
+
+        if (area) leadData.area = String(area).trim();
+        if (whatsappNumber) {
+            const wa = String(whatsappNumber).replace(/\D/g, '').slice(0, 10);
+            if (wa.length === 10) leadData.whatsappNumber = wa;
+        }
+        if (plusCode) leadData.plusCode = String(plusCode).trim();
+        if (mapLink) leadData.mapLink = String(mapLink).trim();
+        if (serviceType) leadData.serviceType = String(serviceType).trim();
+        if (tankSizeLtr != null) leadData.tankSizeLtr = Number(tankSizeLtr) || 0;
+        if (numberOfTanks != null) leadData.numberOfTanks = Number(numberOfTanks) || 0;
+        if (quotedPrice != null) leadData.quotedPrice = Number(quotedPrice) || 0;
+        if (finalPrice != null) leadData.finalPrice = Number(finalPrice) || 0;
+        if (bookingDate) leadData.bookingDate = new Date(bookingDate);
+        if (timeSlot) leadData.timeSlot = String(timeSlot).trim();
+        if (Array.isArray(assignedStaff)) leadData.assignedStaff = assignedStaff;
+        if (jobStatus) leadData.jobStatus = String(jobStatus).trim();
+        if (paymentStatus) leadData.paymentStatus = String(paymentStatus).trim();
+        if (paymentMode) leadData.paymentMode = String(paymentMode).trim();
+        if (notes) leadData.notes = String(notes).trim();
+
+        const lead = new Lead(leadData);
 
         await lead.save();
         res.status(201).json(lead);
@@ -251,6 +322,22 @@ app.put('/api/leads/:id', auth, async (req, res) => {
             'status',
             'nextFollowUpAt',
             'tags',
+            'area',
+            'whatsappNumber',
+            'plusCode',
+            'mapLink',
+            'serviceType',
+            'tankSizeLtr',
+            'numberOfTanks',
+            'quotedPrice',
+            'finalPrice',
+            'bookingDate',
+            'timeSlot',
+            'assignedStaff',
+            'jobStatus',
+            'paymentStatus',
+            'paymentMode',
+            'notes',
         ];
 
         for (const key of allowedFields) {
@@ -265,6 +352,28 @@ app.put('/api/leads/:id', auth, async (req, res) => {
                 return res.status(400).json({ message: 'Enter valid 10 digit mobile number' });
             }
             updates.mobileNumber = mobileDigits;
+        }
+
+        if (updates.whatsappNumber) {
+            const wa = String(updates.whatsappNumber).replace(/\D/g, '').slice(0, 10);
+            updates.whatsappNumber = wa;
+        }
+
+        if (updates.bookingDate) {
+            updates.bookingDate = new Date(updates.bookingDate);
+        }
+
+        if (updates.tankSizeLtr != null) {
+            updates.tankSizeLtr = Number(updates.tankSizeLtr) || 0;
+        }
+        if (updates.numberOfTanks != null) {
+            updates.numberOfTanks = Number(updates.numberOfTanks) || 0;
+        }
+        if (updates.quotedPrice != null) {
+            updates.quotedPrice = Number(updates.quotedPrice) || 0;
+        }
+        if (updates.finalPrice != null) {
+            updates.finalPrice = Number(updates.finalPrice) || 0;
         }
 
         const lead = await Lead.findByIdAndUpdate(req.params.id, updates, { new: true });
@@ -317,10 +426,38 @@ app.get('/api/users', auth, async (req, res) => {
 app.put('/api/users/:id', auth, async (req, res) => {
     if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
     try {
-        const { isActive, name } = req.body;
+        const {
+            isActive,
+            name,
+            businessName,
+            location,
+            staffCode,
+            staffType,
+            fixedSalary,
+            perTankIncentive,
+            hasBike,
+            fuelAllowance,
+            joiningDate,
+            employmentStatus,
+            remarks,
+        } = req.body;
         const updates = {};
         if (typeof isActive === 'boolean') updates.isActive = isActive;
         if (name) updates.name = name;
+        if (businessName !== undefined) updates.businessName = businessName || '';
+        if (location !== undefined) updates.location = location || '';
+        if (staffCode !== undefined) updates.staffCode = staffCode || '';
+        if (staffType && ['Full Time', 'Part Time'].includes(staffType)) updates.staffType = staffType;
+        if (fixedSalary != null) updates.fixedSalary = Number(fixedSalary) || 0;
+        if (perTankIncentive != null) updates.perTankIncentive = Number(perTankIncentive) || 0;
+        if (typeof hasBike === 'boolean') updates.hasBike = hasBike;
+        if (fuelAllowance != null) updates.fuelAllowance = Number(fuelAllowance) || 0;
+        if (joiningDate) updates.joiningDate = new Date(joiningDate);
+        if (employmentStatus && ['Active', 'Inactive', 'Terminated'].includes(employmentStatus)) {
+            updates.employmentStatus = employmentStatus;
+            updates.isActive = employmentStatus === 'Active';
+        }
+        if (remarks !== undefined) updates.remarks = remarks || '';
         const user = await User.findByIdAndUpdate(req.params.id, updates, { new: true }).select('-password');
         if (!user) return res.status(404).json({ message: 'User not found' });
         res.json(user);
@@ -339,6 +476,67 @@ app.delete('/api/users/:id', auth, async (req, res) => {
         res.json({ success: true, message: 'Staff deleted' });
     } catch (err) {
         res.status(500).json({ message: err.message });
+    }
+});
+
+// --- EXPENSES ---
+
+// Create expense
+app.post('/api/expenses', auth, async (req, res) => {
+    if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
+    try {
+        const {
+            date,
+            amount,
+            category,
+            purpose,
+            staffName,
+            staffId,
+            paymentMode,
+            notes,
+        } = req.body;
+
+        if (!date || amount == null || !category) {
+            return res.status(400).json({ message: 'Date, amount and category are required' });
+        }
+
+        const expense = new Expense({
+            date: new Date(date),
+            amount: Number(amount) || 0,
+            category,
+            purpose: purpose || '',
+            staffName: staffName || '',
+            staffId: staffId || undefined,
+            paymentMode: paymentMode || '',
+            notes: notes || '',
+            createdBy: req.user.id,
+        });
+
+        await expense.save();
+        res.status(201).json(expense);
+    } catch (err) {
+        res.status(500).json({ message: err.message || 'Failed to create expense' });
+    }
+});
+
+// List expenses (optional filters: from, to, category)
+app.get('/api/expenses', auth, async (req, res) => {
+    if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
+    try {
+        const { from, to, category } = req.query;
+        const filter = {};
+
+        if (from || to) {
+            filter.date = {};
+            if (from) filter.date.$gte = new Date(from);
+            if (to) filter.date.$lte = new Date(to);
+        }
+        if (category) filter.category = category;
+
+        const expenses = await Expense.find(filter).sort({ date: -1, createdAt: -1 });
+        res.json(expenses);
+    } catch (err) {
+        res.status(500).json({ message: err.message || 'Failed to load expenses' });
     }
 });
 
@@ -724,8 +922,8 @@ app.get('/api/reports/summary', auth, async (req, res) => {
         const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-        // Daily & Monthly Revenue (paid jobs)
-        const [dailyPaidJobs, monthlyPaidJobs] = await Promise.all([
+        // Daily & Monthly Revenue (paid jobs) + Daily Jobs + Daily Expense
+        const [dailyPaidJobs, monthlyPaidJobs, dailyJobsCount, dailyExpenses] = await Promise.all([
             Job.find({
                 paymentStatus: 'paid',
                 'timeline.completedAt': { $gte: startOfDay }
@@ -733,11 +931,22 @@ app.get('/api/reports/summary', auth, async (req, res) => {
             Job.find({
                 paymentStatus: 'paid',
                 'timeline.completedAt': { $gte: startOfMonth }
+            }),
+            Job.countDocuments({
+                'timeline.completedAt': { $gte: startOfDay }
+            }),
+            Expense.find({
+                date: {
+                    $gte: startOfDay,
+                    $lt: new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000)
+                }
             })
         ]);
 
         const dailyRevenue = dailyPaidJobs.reduce((sum, j) => sum + (j.serviceCharge || 0), 0);
         const monthlyRevenue = monthlyPaidJobs.reduce((sum, j) => sum + (j.serviceCharge || 0), 0);
+        const dailyExpense = dailyExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+        const dailyNetProfit = dailyRevenue - dailyExpense;
 
         // Staff wise revenue (paid)
         const staffWise = await Job.aggregate([
@@ -782,7 +991,7 @@ app.get('/api/reports/summary', auth, async (req, res) => {
         const fifteenDaysLater = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000);
         const repeatJobs = await Job.find({
             nextServiceAt: { $gte: startOfDay, $lte: fifteenDaysLater }
-        }).select('customerName mobileNumber nextServiceAt serviceType tankSize');
+        }).select('customerName mobileNumber address nextServiceAt serviceType tankSize notes timeline.completedAt');
 
         // Upcoming jobs (job reminder) based on scheduledAt (next 6 hours)
         const sixHoursLater = new Date(now.getTime() + 6 * 60 * 60 * 1000);
@@ -802,6 +1011,13 @@ app.get('/api/reports/summary', auth, async (req, res) => {
                 followUps: followUpLeads,
                 repeatCleanings: repeatJobs,
                 upcomingJobs
+            },
+            summary: {
+                date: startOfDay,
+                totalJobs: dailyJobsCount,
+                totalRevenue: dailyRevenue,
+                totalExpense: dailyExpense,
+                netProfit: dailyNetProfit
             }
         });
     } catch (err) {

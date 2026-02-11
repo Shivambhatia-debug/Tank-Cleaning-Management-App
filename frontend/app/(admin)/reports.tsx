@@ -72,6 +72,56 @@ export default function ReportsScreen() {
           </View>
         </View>
 
+        {/* Today summary: Jobs / Revenue / Expense / Net */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Today summary</Text>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>
+              Date:{' '}
+              <Text style={styles.summaryValue}>
+                {reports?.summary?.date
+                  ? new Date(reports.summary.date).toLocaleDateString()
+                  : '--'}
+              </Text>
+            </Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>
+              Total jobs:{' '}
+              <Text style={styles.summaryValue}>{reports?.summary?.totalJobs ?? 0}</Text>
+            </Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>
+              Total revenue:{' '}
+              <Text style={styles.summaryValue}>
+                ₹{reports?.summary?.totalRevenue?.toLocaleString?.('en-IN') ?? '0'}
+              </Text>
+            </Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>
+              Total expense:{' '}
+              <Text style={styles.summaryValue}>
+                ₹{reports?.summary?.totalExpense?.toLocaleString?.('en-IN') ?? '0'}
+              </Text>
+            </Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>
+              Net profit:{' '}
+              <Text
+                style={[
+                  styles.summaryValue,
+                  (reports?.summary?.netProfit ?? 0) < 0 && { color: '#b91c1c' },
+                ]}
+              >
+                ₹{reports?.summary?.netProfit?.toLocaleString?.('en-IN') ?? '0'}
+              </Text>
+            </Text>
+          </View>
+        </View>
+
         {/* Staff wise revenue */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Staff wise revenue</Text>
@@ -127,6 +177,57 @@ export default function ReportsScreen() {
             ))
           ) : (
             <Text style={styles.emptyText}>No repeat customers yet.</Text>
+          )}
+        </View>
+
+        {/* Repeat cleaning reminders (6 month due) */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Repeat cleaning reminders</Text>
+          {reports?.reminders?.repeatCleanings?.length ? (
+            reports.reminders.repeatCleanings.map((j: any) => {
+              const lastService =
+                j.timeline?.completedAt ? new Date(j.timeline.completedAt) : null;
+              const nextDue = j.nextServiceAt ? new Date(j.nextServiceAt) : null;
+              let statusLabel = 'Upcoming';
+              if (nextDue) {
+                const today = new Date();
+                const dOnly = new Date(
+                  today.getFullYear(),
+                  today.getMonth(),
+                  today.getDate()
+                );
+                const nOnly = new Date(
+                  nextDue.getFullYear(),
+                  nextDue.getMonth(),
+                  nextDue.getDate()
+                );
+                if (nOnly.getTime() === dOnly.getTime()) statusLabel = 'Due today';
+                else if (nOnly.getTime() < dOnly.getTime()) statusLabel = 'Overdue';
+              }
+              return (
+                <View key={j._id} style={styles.listRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.listLeft}>{j.customerName || 'Customer'}</Text>
+                    <Text style={styles.subLine}>📱 {j.mobileNumber || 'N/A'}</Text>
+                    {j.address ? (
+                      <Text style={styles.subLine}>📍 {j.address}</Text>
+                    ) : null}
+                    <Text style={styles.subLine}>
+                      Last: {lastService ? lastService.toLocaleDateString() : 'N/A'} · Next:{' '}
+                      {nextDue ? nextDue.toLocaleDateString() : 'N/A'}
+                    </Text>
+                    {j.notes ? (
+                      <Text style={styles.subLine} numberOfLines={2}>
+                        📝 {j.notes}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <Text style={styles.badge}>{statusLabel}</Text>
+                </View>
+              );
+            })
+          ) : (
+            <Text style={styles.emptyText}>No repeat cleaning reminders in next 15 days.</Text>
           )}
         </View>
 
@@ -218,6 +319,18 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#9ca3af',
     marginTop: 6,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    marginTop: 4,
+  },
+  summaryLabel: {
+    fontSize: 13,
+    color: '#4b5563',
+  },
+  summaryValue: {
+    fontWeight: '600',
+    color: '#111827',
   },
 });
 

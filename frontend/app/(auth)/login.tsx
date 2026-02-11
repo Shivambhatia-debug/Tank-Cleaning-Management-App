@@ -72,6 +72,7 @@ export default function LoginScreen() {
             <TextInput
               style={styles.input}
               placeholder="10 digit phone number"
+              placeholderTextColor="#9CA3AF"
               value={phone}
               onChangeText={(t) => setPhone(t.replace(/\D/g, '').slice(0, 10))}
               keyboardType="phone-pad"
@@ -86,6 +87,7 @@ export default function LoginScreen() {
             <TextInput
               style={styles.input}
               placeholder="Enter your password"
+              placeholderTextColor="#9CA3AF"
               value={password}
               onChangeText={setPassword}
               secureTextEntry

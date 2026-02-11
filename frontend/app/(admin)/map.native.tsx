@@ -9,14 +9,27 @@ import {
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import MapView, { Marker } from 'react-native-maps';
 import api from '../../utils/api';
 
-const DEFAULT_REGION = {
-  latitude: 26.1775,
-  longitude: 85.8714,
-  latitudeDelta: 0.05,
-  longitudeDelta: 0.05,
+// Haversine distance (meters) between two lat/lng points
+const distanceInMeters = (
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+) => {
+  const toRad = (v: number) => (v * Math.PI) / 180;
+  const R = 6371000; // Earth radius in meters
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
 };
 
 export default function LiveMapScreen() {
@@ -118,16 +131,10 @@ export default function LiveMapScreen() {
     );
   }
 
-  // Job select hone par: sirf us job ka map + location dikhao
+  // Job select hone par: dummy layout + distance (no real map)
   const job = selectedJobForMap;
-  const jobLat = job.latitude ?? job.targetLatitude ?? DEFAULT_REGION.latitude;
-  const jobLng = job.longitude ?? job.targetLongitude ?? DEFAULT_REGION.longitude;
-  const mapRegion = {
-    latitude: jobLat,
-    longitude: jobLng,
-    latitudeDelta: 0.02,
-    longitudeDelta: 0.02,
-  };
+  const jobLat = job.latitude ?? job.targetLatitude ?? null;
+  const jobLng = job.longitude ?? job.targetLongitude ?? null;
   const staffList = Array.isArray(job.assignedStaff) ? job.assignedStaff : [];
 
   return (
@@ -145,48 +152,85 @@ export default function LiveMapScreen() {
         <View style={{ width: 60 }} />
       </View>
 
-      <View style={styles.mapWrapper}>
-        <MapView
-          style={styles.map}
-          initialRegion={mapRegion}
-          showsUserLocation
-          showsMyLocationButton
-        >
-          <Marker
-            coordinate={{ latitude: jobLat, longitude: jobLng }}
-            title={job.customerName || job.customer_name || 'Job'}
-            description={job.address}
-            pinColor="#007AFF"
-          />
-          {staffList.map((staff: any) => {
-            if (staff == null || typeof staff !== 'object') return null;
-            const slat = staff.lastLatitude;
-            const slng = staff.lastLongitude;
-            if (slat == null || slng == null) return null;
-            return (
-              <Marker
-                key={staff._id || staff.id}
-                coordinate={{ latitude: slat, longitude: slng }}
-                title={staff.name || 'Staff'}
-                description={staff.lastLocationTime ? new Date(staff.lastLocationTime).toLocaleTimeString() : ''}
-                pinColor="#34C759"
-              />
-            );
-          })}
-        </MapView>
-      </View>
-
       <View style={styles.mapJobDetail}>
-        <Text style={styles.mapJobDetailTitle}>📍 {job.customerName || job.customer_name || 'Job'}</Text>
-        <Text style={styles.mapJobDetailAddress}>{job.address}</Text>
-        <Text style={styles.mapJobDetailCoords}>
-          {jobLat.toFixed(4)}, {jobLng.toFixed(4)}
+        <Text style={styles.mapJobDetailTitle}>
+          📍 {job.customerName || job.customer_name || 'Job'}
         </Text>
-        {staffList.length > 0 && (
-          <Text style={styles.mapJobDetailStaff}>
-            👷 {(staffList as any[]).map((s: any) => s.name || s.phone).filter(Boolean).join(', ')}
+        <Text style={styles.mapJobDetailAddress}>{job.address}</Text>
+
+        {jobLat != null && jobLng != null && (
+          <Text style={styles.mapJobDetailCoords}>
+            Target coords: {jobLat.toFixed(4)}, {jobLng.toFixed(4)}
           </Text>
         )}
+
+        <View style={styles.trackingBox}>
+          <Text style={styles.trackingTitle}>Live distance (dummy map)</Text>
+          {staffList.length === 0 && (
+            <Text style={styles.trackingSub}>
+              No staff assigned or no live location yet.
+            </Text>
+          )}
+          {staffList.map((staff: any) => {
+            if (!staff || typeof staff !== 'object') return null;
+            const slat = staff.lastLatitude;
+            const slng = staff.lastLongitude;
+            if (
+              slat == null ||
+              slng == null ||
+              jobLat == null ||
+              jobLng == null
+            ) {
+              return (
+                <View
+                  key={staff._id || staff.id || staff.phone}
+                  style={styles.distanceRow}
+                >
+                  <Text style={styles.distanceLabel}>
+                    {staff.name || staff.phone || 'Staff'} – waiting for GPS...
+                  </Text>
+                </View>
+              );
+            }
+            const dMeters = distanceInMeters(slat, slng, jobLat, jobLng);
+            const dKm = dMeters / 1000;
+            const reached = dMeters <= 50; // ~50m radius ko "arrived" maan lo
+            return (
+              <View
+                key={staff._id || staff.id || staff.phone}
+                style={styles.distanceRow}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.distanceLabel}>
+                    {staff.name || staff.phone || 'Staff'}
+                  </Text>
+                  <Text style={styles.distanceValue}>
+                    Current distance from job:{' '}
+                    {dMeters < 1000
+                      ? `${dMeters.toFixed(0)} m`
+                      : `${dKm.toFixed(2)} km`}
+                  </Text>
+                  {staff.lastLocationTime && (
+                    <Text style={styles.distanceMeta}>
+                      Last update:{' '}
+                      {new Date(staff.lastLocationTime).toLocaleTimeString()}
+                    </Text>
+                  )}
+                </View>
+                <View>
+                  <Text
+                    style={[
+                      styles.distanceBadge,
+                      reached && styles.arrivedBadge,
+                    ]}
+                  >
+                    {reached ? 'ARRIVED' : 'ON THE WAY'}
+                  </Text>
+                </View>
+              </View>
+            );
+          })}
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -300,14 +344,6 @@ const styles = StyleSheet.create({
     color: '#007AFF',
     fontWeight: '500',
   },
-  mapWrapper: {
-    flex: 1,
-    minHeight: 220,
-  },
-  map: {
-    flex: 1,
-    width: '100%',
-  },
   mapJobDetail: {
     backgroundColor: '#fff',
     borderTopWidth: 1,
@@ -333,5 +369,56 @@ const styles = StyleSheet.create({
   mapJobDetailStaff: {
     fontSize: 13,
     color: '#555',
+  },
+  trackingBox: {
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5EA',
+  },
+  trackingTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 6,
+  },
+  trackingSub: {
+    fontSize: 13,
+    color: '#6b7280',
+  },
+  distanceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 8,
+    paddingVertical: 6,
+  },
+  distanceLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#111827',
+  },
+  distanceValue: {
+    fontSize: 13,
+    color: '#4b5563',
+    marginTop: 2,
+  },
+  distanceMeta: {
+    fontSize: 11,
+    color: '#9ca3af',
+    marginTop: 2,
+  },
+  distanceBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#1d4ed8',
+    backgroundColor: '#dbeafe',
+  },
+  arrivedBadge: {
+    color: '#166534',
+    backgroundColor: '#bbf7d0',
   },
 });

@@ -17,6 +17,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker } from 'react-native-maps';
+import { decode as decodePlusCode } from 'pluscodes';
 import api, { getUploadsBaseUrl } from '../../utils/api';
 import BrandText from '../../components/BrandText';
 
@@ -35,14 +36,12 @@ export default function JobsManagementScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [creatingJob, setCreatingJob] = useState(false);
   const [filterStatus, setFilterStatus] = useState('all');
-  const [mapPickerVisible, setMapPickerVisible] = useState(false);
-  const [pickerLat, setPickerLat] = useState(26.1775);
-  const [pickerLng, setPickerLng] = useState(85.8714);
   const [newJob, setNewJob] = useState({
     customer_name: '',
     address: '',
     latitude: 0,
     longitude: 0,
+    plus_code: '',
     assigned_staff_ids: [] as string[],
     notes: '',
     // CRM Fields
@@ -141,6 +140,7 @@ export default function JobsManagementScreen() {
       address: '',
       latitude: 0,
       longitude: 0,
+      plus_code: '',
       assigned_staff_ids: [],
       notes: '',
       mobile_number: '',
@@ -149,6 +149,32 @@ export default function JobsManagementScreen() {
       lead_source: 'Call',
       service_charge: '',
     });
+  };
+
+  const applyPlusCodeLocation = () => {
+    const code = (newJob.plus_code || '').trim();
+    if (!code) {
+      return;
+    }
+    try {
+      const { latitude, longitude } = decodePlusCode(code);
+      if (
+        typeof latitude === 'number' &&
+        typeof longitude === 'number' &&
+        !Number.isNaN(latitude) &&
+        !Number.isNaN(longitude)
+      ) {
+        setNewJob({
+          ...newJob,
+          latitude,
+          longitude,
+        });
+      } else {
+        Alert.alert('Invalid Plus Code', 'Please check the Google Plus Code and try again.');
+      }
+    } catch (e) {
+      Alert.alert('Invalid Plus Code', 'Please check the Google Plus Code and try again.');
+    }
   };
 
   const toggleStaffSelection = (staffId: string) => {
@@ -384,48 +410,17 @@ export default function JobsManagementScreen() {
                 maxLength={10}
               />
 
-              <Text style={styles.label}>Target Location</Text>
-              {Platform.OS !== 'web' && (
-                <TouchableOpacity
-                  style={styles.chooseOnMapButton}
-                  onPress={() => {
-                    // Android + iOS: open full-screen map picker
-                    setPickerLat(newJob.latitude || DEFAULT_MAP_REGION.latitude);
-                    setPickerLng(newJob.longitude || DEFAULT_MAP_REGION.longitude);
-                    setMapPickerVisible(true);
-                  }}
-                >
-                  <Ionicons name="map-outline" size={22} color="#007AFF" />
-                  <Text style={styles.chooseOnMapButtonText}>Choose on map</Text>
-                </TouchableOpacity>
-              )}
-              <View style={styles.row}>
-                <View style={styles.col}>
-                  <Text style={styles.labelSmall}>Latitude</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="e.g. 26.17"
-                    value={String(newJob.latitude || '')}
-                    onChangeText={(text) => setNewJob({ ...newJob, latitude: parseFloat(text) || 0 })}
-                    keyboardType="numeric"
-                  />
-                </View>
-                <View style={{ width: 10 }} />
-                <View style={styles.col}>
-                  <Text style={styles.labelSmall}>Longitude</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="e.g. 85.87"
-                    value={String(newJob.longitude || '')}
-                    onChangeText={(text) => setNewJob({ ...newJob, longitude: parseFloat(text) || 0 })}
-                    keyboardType="numeric"
-                  />
-                </View>
-              </View>
+              <Text style={styles.label}>Target Location (Google Plus Code)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. 7JVW8Q5C+P3"
+                value={newJob.plus_code}
+                onChangeText={(text) => setNewJob({ ...newJob, plus_code: text })}
+                onEndEditing={applyPlusCodeLocation}
+                autoCapitalize="characters"
+              />
 
-              {/* Mini map preview so admin can see marker for the typed lat/lng,
-                  without opening the full-screen picker (which was crashing on
-                  some Android builds). */}
+              {/* Mini map preview so admin can see marker for the decoded plus code */}
               {Platform.OS !== 'web' && newJob.latitude && newJob.longitude ? (
                 <View style={styles.previewMapWrap}>
                   <Text style={styles.labelSmall}>Location preview</Text>
@@ -578,64 +573,6 @@ export default function JobsManagementScreen() {
             </View>
           </ScrollView>
         </View>
-      </Modal>
-
-      {/* Map picker modal - tap on map to choose location */}
-      <Modal
-        visible={mapPickerVisible}
-        animationType="slide"
-        transparent={false}
-        onRequestClose={() => setMapPickerVisible(false)}
-      >
-        <SafeAreaView style={styles.mapPickerContainer}>
-          <View style={styles.mapPickerHeader}>
-            <Text style={styles.mapPickerTitle}>Choose job location</Text>
-            <Text style={styles.mapPickerHint}>Tap on map to set pin</Text>
-          </View>
-          <View style={styles.mapPickerMapWrap}>
-            <MapView
-              style={styles.mapPickerMap}
-              initialRegion={{
-                latitude: pickerLat,
-                longitude: pickerLng,
-                latitudeDelta: DEFAULT_MAP_REGION.latitudeDelta,
-                longitudeDelta: DEFAULT_MAP_REGION.longitudeDelta,
-              }}
-              onPress={(e) => {
-                const { latitude, longitude } = e.nativeEvent.coordinate;
-                setPickerLat(latitude);
-                setPickerLng(longitude);
-              }}
-            >
-              <Marker
-                coordinate={{ latitude: pickerLat, longitude: pickerLng }}
-                title="Job location"
-              />
-            </MapView>
-          </View>
-          <View style={styles.mapPickerCoords}>
-            <Text style={styles.mapPickerCoordsText}>
-              {pickerLat.toFixed(5)}, {pickerLng.toFixed(5)}
-            </Text>
-          </View>
-          <View style={styles.mapPickerButtons}>
-            <TouchableOpacity
-              style={[styles.mapPickerBtn, styles.mapPickerBtnCancel]}
-              onPress={() => setMapPickerVisible(false)}
-            >
-              <Text style={styles.mapPickerBtnCancelText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.mapPickerBtn, styles.mapPickerBtnUse]}
-              onPress={() => {
-                setNewJob({ ...newJob, latitude: pickerLat, longitude: pickerLng });
-                setMapPickerVisible(false);
-              }}
-            >
-              <Text style={styles.mapPickerBtnUseText}>Use this location</Text>
-            </TouchableOpacity>
-          </View>
-        </SafeAreaView>
       </Modal>
     </SafeAreaView>
   );
@@ -891,89 +828,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     marginBottom: 4,
-  },
-  chooseOnMapButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#E3F2FD',
-    borderRadius: 10,
-    marginBottom: 12,
-    gap: 8,
-  },
-  chooseOnMapButtonText: {
-    fontSize: 16,
-    color: '#007AFF',
-    fontWeight: '600',
-  },
-  mapPickerContainer: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  mapPickerHeader: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
-  },
-  mapPickerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  mapPickerHint: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
-  },
-  mapPickerMapWrap: {
-    flex: 1,
-    minHeight: 300,
-  },
-  mapPickerMap: {
-    width: '100%',
-    height: '100%',
-  },
-  mapPickerCoords: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    backgroundColor: '#F5F5F5',
-  },
-  mapPickerCoordsText: {
-    fontSize: 13,
-    color: '#555',
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-  },
-  mapPickerButtons: {
-    flexDirection: 'row',
-    padding: 16,
-    gap: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E5EA',
-  },
-  mapPickerBtn: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  mapPickerBtnCancel: {
-    backgroundColor: '#F0F0F0',
-  },
-  mapPickerBtnCancelText: {
-    fontSize: 16,
-    color: '#333',
-    fontWeight: '600',
-  },
-  mapPickerBtnUse: {
-    backgroundColor: '#007AFF',
-  },
-  mapPickerBtnUseText: {
-    fontSize: 16,
-    color: '#fff',
-    fontWeight: '600',
   },
   previewMapWrap: {
     marginTop: 4,

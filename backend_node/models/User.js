@@ -26,6 +26,23 @@ const userSchema = new mongoose.Schema({
     },
     businessName: { type: String, default: '' },
     location: { type: String, default: '' },
+    staffCode: { type: String, trim: true },
+    staffType: {
+        type: String,
+        enum: ['Full Time', 'Part Time'],
+        default: 'Full Time'
+    },
+    fixedSalary: { type: Number },
+    perTankIncentive: { type: Number },
+    hasBike: { type: Boolean, default: false },
+    fuelAllowance: { type: Number },
+    joiningDate: { type: Date },
+    employmentStatus: {
+        type: String,
+        enum: ['Active', 'Inactive', 'Terminated'],
+        default: 'Active'
+    },
+    remarks: { type: String, trim: true },
     plainPasswordForAdmin: { type: String, default: '' },
     createdAt: {
         type: Date,
