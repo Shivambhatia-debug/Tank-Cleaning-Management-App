@@ -15,24 +15,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AppHeader from '../../components/AppHeader';
-import { decode as decodePlusCode, expand as expandPlusCode } from 'pluscodes';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../utils/api';
-
-// Muzaffarpur area ke liye reference location (short Plus Code expand karne ke liye)
-const PLUS_CODE_REF = { latitude: 26.1775, longitude: 85.8714 };
-
-// Full + short (local) Plus Code dono support karega – humesha Muzaffarpur ke aas‑paas treat karega
-const decodeAnyPlusCode = (code: string) => {
-  const raw = (code || '').trim().toUpperCase();
-  if (!raw) {
-    throw new Error('Empty Plus Code');
-  }
-  // Humesha local/short code maan kar Muzaffarpur reference se expand karo,
-  // taaki 5VMW+979 jaise codes bhi yahi region me aaye.
-  const full = expandPlusCode(raw, PLUS_CODE_REF);
-  return decodePlusCode(full);
-};
 
 const JOB_STATUS_OPTIONS = [
   'New Lead',
@@ -53,10 +37,7 @@ type Lead = {
   area?: string;
   status: string;
   source?: string;
-  latitude?: number;
-  longitude?: number;
   whatsappNumber?: string;
-  plusCode?: string;
   mapLink?: string;
   serviceType?: string;
   tankSizeLtr?: number;
@@ -99,7 +80,6 @@ export default function LeadsScreen() {
     whatsappNumber: '',
     address: '',
     area: '',
-    plusCode: '',
     mapLink: '',
     serviceType: 'Water Tank',
     tankSizeLtr: '',
@@ -119,7 +99,6 @@ export default function LeadsScreen() {
   const [logNextDate, setLogNextDate] = useState('');
   const [addingLog, setAddingLog] = useState(false);
   const [creatingJobFromLead, setCreatingJobFromLead] = useState(false);
-  const [detailPlusCode, setDetailPlusCode] = useState('');
   const [detailJobStatus, setDetailJobStatus] = useState<(typeof JOB_STATUS_OPTIONS)[number]>('New Lead');
   const [detailPaymentStatus, setDetailPaymentStatus] = useState<(typeof PAYMENT_STATUS_OPTIONS)[number]>('Pending');
    const [selectedJobStaffIds, setSelectedJobStaffIds] = useState<string[]>([]);
@@ -192,30 +171,6 @@ export default function LeadsScreen() {
       if (newLead.paymentMode.trim()) payload.paymentMode = newLead.paymentMode.trim();
       if (newLead.notes.trim()) payload.notes = newLead.notes.trim();
 
-      if (newLead.plusCode.trim()) {
-        try {
-          const { latitude, longitude } = decodeAnyPlusCode(newLead.plusCode.trim());
-          if (
-            typeof latitude === 'number' &&
-            typeof longitude === 'number' &&
-            !Number.isNaN(latitude) &&
-            !Number.isNaN(longitude)
-          ) {
-            payload.latitude = latitude;
-            payload.longitude = longitude;
-            payload.plusCode = newLead.plusCode.trim();
-          } else {
-            Alert.alert('Invalid Plus Code', 'Plus Code sahi nahi hai, dubara check karein.');
-            setCreating(false);
-            return;
-          }
-        } catch {
-          Alert.alert('Invalid Plus Code', 'Plus Code sahi nahi hai, dubara check karein.');
-          setCreating(false);
-          return;
-        }
-      }
-
       const res = await api.post<Lead>('/leads', payload);
       setCreateModalVisible(false);
       setNewLead({
@@ -224,7 +179,6 @@ export default function LeadsScreen() {
         whatsappNumber: '',
         address: '',
         area: '',
-        plusCode: '',
         mapLink: '',
         serviceType: 'Water Tank',
         tankSizeLtr: '',
@@ -254,7 +208,6 @@ export default function LeadsScreen() {
       setSelectedLead(res.data);
       setDetailJobStatus((res.data.jobStatus as any) || 'New Lead');
       setDetailPaymentStatus((res.data.paymentStatus as any) || 'Pending');
-      setDetailPlusCode(res.data.plusCode || '');
       setSelectedJobStaffIds([]);
       setDetailModalVisible(true);
     } catch (err: any) {
@@ -316,39 +269,14 @@ export default function LeadsScreen() {
       const DEFAULT_LAT = 26.1775;
       const DEFAULT_LNG = 85.8714;
 
-      // Jo bhi latest Plus Code input me hai (detailPlusCode) usko priority do.
-      const activePlusCode = (detailPlusCode || selectedLead.plusCode || '').trim();
-
       const addressFromLead =
         (selectedLead.address && selectedLead.address.trim()) ||
         (selectedLead.area && selectedLead.area.trim()) ||
-        (activePlusCode && `Plus Code: ${activePlusCode}`) ||
         'Address from lead';
 
-      // Try to use precise coordinates from lead; if missing but Plus Code exists
-      // (prefer latest activePlusCode from field), decode yahi par.
-      let latFromLead = selectedLead.latitude as number | null | undefined;
-      let lngFromLead = selectedLead.longitude as number | null | undefined;
-      if (
-        (latFromLead == null || Number.isNaN(latFromLead)) &&
-        (lngFromLead == null || Number.isNaN(lngFromLead)) &&
-        activePlusCode
-      ) {
-        try {
-          const decoded = decodeAnyPlusCode(activePlusCode);
-          if (
-            typeof decoded.latitude === 'number' &&
-            typeof decoded.longitude === 'number' &&
-            !Number.isNaN(decoded.latitude) &&
-            !Number.isNaN(decoded.longitude)
-          ) {
-            latFromLead = decoded.latitude;
-            lngFromLead = decoded.longitude;
-          }
-        } catch {
-          // ignore; will fallback to default below
-        }
-      }
+      // Lead me agar latitude/longitude hai to use karenge, warna default center
+      let latFromLead = (selectedLead as any).latitude as number | null | undefined;
+      let lngFromLead = (selectedLead as any).longitude as number | null | undefined;
 
       const payload: any = {
         customerName: selectedLead.customerName,
@@ -577,16 +505,6 @@ export default function LeadsScreen() {
                 placeholderTextColor="#9CA3AF"
                 value={newLead.area}
                 onChangeText={(t) => setNewLead({ ...newLead, area: t })}
-              />
-
-              <Text style={styles.label}>Google Plus Code</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. 7JVW8Q5C+P3"
-                placeholderTextColor="#9CA3AF"
-                autoCapitalize="characters"
-                value={newLead.plusCode}
-                onChangeText={(t) => setNewLead({ ...newLead, plusCode: t })}
               />
 
               <Text style={styles.label}>Map Link (optional)</Text>
@@ -840,7 +758,7 @@ export default function LeadsScreen() {
 
                 {/* Assign staff for job created from this lead */}
                 <View style={styles.addLogSection}>
-                  <Text style={styles.labelSmall}>Assign staff for this job (optional)</Text>
+                  <Text style={styles.labelSmall}>Assign staff for this job</Text>
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
@@ -926,55 +844,6 @@ export default function LeadsScreen() {
                     placeholderTextColor="#9CA3AF"
                     value={logNextDate}
                     onChangeText={setLogNextDate}
-                  />
-
-                  <Text style={[styles.labelSmall, { marginTop: 6 }]}>
-                    Google Plus Code (optional, accurate location ke liye)
-                  </Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="e.g. 7JVW8Q5C+P3"
-                    placeholderTextColor="#9CA3AF"
-                    value={detailPlusCode}
-                    autoCapitalize="characters"
-                    onChangeText={setDetailPlusCode}
-                    onEndEditing={async () => {
-                      const code = detailPlusCode.trim();
-                      if (!code || !selectedLead?._id) return;
-                      try {
-                        const { latitude, longitude } = decodeAnyPlusCode(code);
-                        if (
-                          typeof latitude === 'number' &&
-                          typeof longitude === 'number' &&
-                          !Number.isNaN(latitude) &&
-                          !Number.isNaN(longitude)
-                        ) {
-                          setSelectedLead({
-                            ...selectedLead,
-                            latitude,
-                            longitude,
-                            plusCode: code,
-                          });
-                          try {
-                            await api.put(`/leads/${selectedLead._id}`, {
-                              plusCode: code,
-                              latitude,
-                              longitude,
-                            });
-                          } catch (err) {
-                            console.error('Lead plusCode update error', err);
-                          }
-                          Alert.alert(
-                            'Location set',
-                            'Plus Code se job location set ho gaya. Ab "Convert to job" dabayen.'
-                          );
-                        } else {
-                          Alert.alert('Invalid Plus Code', 'Plus Code sahi nahi hai, dubara check karein.');
-                        }
-                      } catch (e) {
-                        Alert.alert('Invalid Plus Code', 'Plus Code sahi nahi hai, dubara check karein.');
-                      }
-                    }}
                   />
 
                   <TouchableOpacity

@@ -17,7 +17,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker } from 'react-native-maps';
-import { decode as decodePlusCode, expand as expandPlusCode } from 'pluscodes';
 import api, { getUploadsBaseUrl } from '../../utils/api';
 import BrandText from '../../components/BrandText';
 
@@ -26,19 +25,6 @@ const DEFAULT_MAP_REGION = {
   longitude: 85.8714,
   latitudeDelta: 0.02,
   longitudeDelta: 0.02,
-};
-
-// Muzaffarpur reference location short Plus Code expand karne ke liye
-const PLUS_CODE_REF = { latitude: 26.1775, longitude: 85.8714 };
-
-const decodeAnyPlusCode = (code: string) => {
-  const raw = (code || '').trim().toUpperCase();
-  if (!raw) {
-    throw new Error('Empty Plus Code');
-  }
-  // Humesha local/short code maan kar Muzaffarpur reference se expand karo
-  const full = expandPlusCode(raw, PLUS_CODE_REF);
-  return decodePlusCode(full);
 };
 
 export default function JobsManagementScreen() {
@@ -54,7 +40,6 @@ export default function JobsManagementScreen() {
     address: '',
     latitude: 0,
     longitude: 0,
-    plus_code: '',
     assigned_staff_ids: [] as string[],
     notes: '',
     // CRM Fields
@@ -153,7 +138,6 @@ export default function JobsManagementScreen() {
       address: '',
       latitude: 0,
       longitude: 0,
-      plus_code: '',
       assigned_staff_ids: [],
       notes: '',
       mobile_number: '',
@@ -162,32 +146,6 @@ export default function JobsManagementScreen() {
       lead_source: 'Call',
       service_charge: '',
     });
-  };
-
-  const applyPlusCodeLocation = () => {
-    const code = (newJob.plus_code || '').trim();
-    if (!code) {
-      return;
-    }
-    try {
-      const { latitude, longitude } = decodeAnyPlusCode(code);
-      if (
-        typeof latitude === 'number' &&
-        typeof longitude === 'number' &&
-        !Number.isNaN(latitude) &&
-        !Number.isNaN(longitude)
-      ) {
-        setNewJob({
-          ...newJob,
-          latitude,
-          longitude,
-        });
-      } else {
-        Alert.alert('Invalid Plus Code', 'Please check the Google Plus Code and try again.');
-      }
-    } catch (e) {
-      Alert.alert('Invalid Plus Code', 'Please check the Google Plus Code and try again.');
-    }
   };
 
   const toggleStaffSelection = (staffId: string) => {
@@ -423,14 +381,32 @@ export default function JobsManagementScreen() {
                 maxLength={10}
               />
 
-              <Text style={styles.label}>Target Location (Google Plus Code)</Text>
+              <Text style={styles.label}>Target Latitude</Text>
               <TextInput
                 style={styles.input}
-                placeholder="e.g. 7JVW8Q5C+P3"
-                value={newJob.plus_code}
-                onChangeText={(text) => setNewJob({ ...newJob, plus_code: text })}
-                onEndEditing={applyPlusCodeLocation}
-                autoCapitalize="characters"
+                placeholder="e.g. 26.1775"
+                keyboardType="numeric"
+                value={String(newJob.latitude || '')}
+                onChangeText={(text) =>
+                  setNewJob({
+                    ...newJob,
+                    latitude: text ? parseFloat(text) || 0 : 0,
+                  })
+                }
+              />
+
+              <Text style={styles.label}>Target Longitude</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. 85.8714"
+                keyboardType="numeric"
+                value={String(newJob.longitude || '')}
+                onChangeText={(text) =>
+                  setNewJob({
+                    ...newJob,
+                    longitude: text ? parseFloat(text) || 0 : 0,
+                  })
+                }
               />
 
               {/* Mini map preview so admin can see marker for the decoded plus code */}
