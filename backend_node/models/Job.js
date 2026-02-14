@@ -100,7 +100,12 @@ const jobSchema = new mongoose.Schema({
     targetLongitude: Number,
     trackingEnabled: { type: Boolean, default: true },
 
-    // Completion Verification (photo + time, date, location from staff device)
+    // Before photo (taken when staff starts the job)
+    beforePhotoAt: { type: Date },
+    beforePhotoLatitude: Number,
+    beforePhotoLongitude: Number,
+
+    // Completion / After photo (taken when staff finishes work)
     completionPhoto: String,
     completionPhotoAt: { type: Date },
     completionLatitude: Number,

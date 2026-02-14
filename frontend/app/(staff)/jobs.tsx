@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,8 +16,11 @@ import { useAuth } from '../../contexts/AuthContext';
 import api from '../../utils/api';
 import AppHeader from '../../components/AppHeader';
 
+const FONT_REGULAR = Platform.select({ ios: 'Avenir Next', android: 'sans-serif', default: 'System' });
+const FONT_MEDIUM = Platform.select({ ios: 'Avenir Next', android: 'sans-serif-medium', default: 'System' });
+
 export default function StaffJobsScreen() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -138,7 +142,7 @@ export default function StaffJobsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <AppHeader title={user?.name} subtitle="My jobs" onLogout={logout} />
+      <AppHeader title={user?.name} subtitle="My Jobs" />
 
       <FlatList
         data={jobs}
@@ -175,7 +179,7 @@ export default function StaffJobsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#f0f4f8',
   },
   loadingContainer: {
     flex: 1,
@@ -187,45 +191,53 @@ const styles = StyleSheet.create({
   },
   earningsCard: {
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 14,
+    borderRadius: 14,
+    padding: 16,
     marginBottom: 14,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 3,
   },
   earningsTitle: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#1a1a1a',
+    fontWeight: '700',
+    color: '#0f172a',
     marginBottom: 10,
+    fontFamily: FONT_MEDIUM,
   },
   earningsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 4,
+    paddingVertical: 6,
   },
   earningsLabel: {
     fontSize: 13,
     color: '#64748b',
+    fontFamily: FONT_REGULAR,
   },
   earningsValue: {
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '700',
     color: '#16a34a',
+    fontFamily: FONT_MEDIUM,
   },
   jobCard: {
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 10,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 12,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#e2e8f0',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 3,
   },
   jobHeader: {
     flexDirection: 'row',
@@ -235,23 +247,25 @@ const styles = StyleSheet.create({
   },
   customerName: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#1a1a1a',
+    fontWeight: '700',
+    color: '#0f172a',
     flex: 1,
+    fontFamily: FONT_MEDIUM,
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 12,
+    borderRadius: 20,
     gap: 4,
   },
   statusText: {
     color: '#fff',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
     textTransform: 'capitalize',
+    fontFamily: FONT_MEDIUM,
   },
   jobInfo: {
     flexDirection: 'row',
@@ -262,41 +276,46 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#64748b',
     flex: 1,
+    fontFamily: FONT_REGULAR,
   },
   jobDetails: {
-    marginTop: 8,
-    paddingTop: 8,
+    marginTop: 10,
+    paddingTop: 10,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#e2e8f0',
+    borderTopColor: '#f1f5f9',
+    gap: 4,
   },
   detailLine: {
     fontSize: 12,
-    color: '#555',
-    marginBottom: 2,
+    color: '#475569',
+    fontFamily: FONT_REGULAR,
   },
   incentiveLine: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#16a34a',
-    fontWeight: '600',
-    marginTop: 2,
+    fontWeight: '700',
+    marginTop: 4,
+    fontFamily: FONT_MEDIUM,
   },
   notes: {
     fontSize: 13,
     color: '#64748b',
     marginTop: 6,
     fontStyle: 'italic',
+    fontFamily: FONT_REGULAR,
   },
   jobFooter: {
     marginTop: 10,
     paddingTop: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#e2e8f0',
+    borderTopColor: '#f1f5f9',
   },
   tapHint: {
     fontSize: 12,
     color: '#0EA5E9',
     textAlign: 'right',
-    fontWeight: '500',
+    fontWeight: '600',
+    fontFamily: FONT_MEDIUM,
   },
   emptyContainer: {
     alignItems: 'center',
@@ -307,5 +326,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#64748b',
     marginTop: 12,
+    fontFamily: FONT_REGULAR,
   },
 });

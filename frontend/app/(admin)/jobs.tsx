@@ -18,10 +18,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker } from 'react-native-maps';
-import api, { getUploadsBaseUrl } from '../../utils/api';
+import api, { resolvePhotoUrl } from '../../utils/api';
 import BrandText from '../../components/BrandText';
 import DropdownPicker from '../../components/DropdownPicker';
 import CalendarPicker from '../../components/CalendarPicker';
+
+const FONT_REGULAR = Platform.select({ ios: 'Avenir Next', android: 'sans-serif', default: 'System' });
+const FONT_MEDIUM = Platform.select({ ios: 'Avenir Next', android: 'sans-serif-medium', default: 'System' });
 
 const TANK_SIZE_OPTIONS = ['500L', '750L', '1000L', '1500L', '2000L', '3000L', '5000L', '10000L'];
 const SERVICE_TYPE_OPTIONS = ['Water Tank', 'Sump Cleaning', 'Overhead Tank', 'Underground Tank', 'RO Tank', 'Aquarium Tank', 'Septic Tank', 'Swimming Pool', 'Other'];
@@ -35,13 +38,13 @@ const DEFAULT_MAP_REGION = {
   longitudeDelta: 0.02,
 };
 
-function CompletionPhotoImage({ filename, getUploadsBaseUrl, style }: { filename: string; getUploadsBaseUrl: () => string; style: any }) {
+function CompletionPhotoImage({ photoPath, style }: { photoPath: string; style: any }) {
   const [loadError, setLoadError] = useState(false);
-  const uri = `${getUploadsBaseUrl()}/uploads/${filename}`;
-  if (loadError) {
+  const uri = resolvePhotoUrl(photoPath);
+  if (loadError || !uri) {
     return (
       <View style={[style, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
-        <Text style={{ fontSize: 12, color: '#666' }}>📷 Photo unavailable</Text>
+        <Text style={{ fontSize: 12, color: '#666' }}>Photo unavailable</Text>
       </View>
     );
   }
@@ -246,7 +249,7 @@ export default function JobsManagementScreen() {
     : jobs.filter(job => job.status === filterStatus);
 
   const renderJobCard = ({ item }: { item: any }) => (
-    <View style={styles.jobCard}>
+    <TouchableOpacity style={styles.jobCard} activeOpacity={0.7} onPress={() => router.push({ pathname: '/(admin)/job-detail', params: { jobId: item._id || item.id } })}>
       <View style={styles.jobHeader}>
         <Text style={styles.customerName}>{item.customerName}</Text>
         <View style={styles.jobHeaderRight}>
@@ -267,44 +270,81 @@ export default function JobsManagementScreen() {
           {item.notes}
         </Text>
       )}
-      {/* CRM Details Display */}
-      <View style={{ marginTop: 4, marginBottom: 8 }}>
-        <Text style={{ fontSize: 12, color: '#555' }}>📱 {item.mobileNumber || 'N/A'}</Text>
-        <Text style={{ fontSize: 12, color: '#555' }}>🛢 {item.tankSize} • {item.serviceType}</Text>
-        <Text style={{ fontSize: 12, color: '#555' }}>
-          💰 {item.paymentStatus === 'paid' ? 'Paid' : 'Payment pending'} • {(item.serviceCharge ?? item.service_charge) > 0 ? `₹${Number(item.serviceCharge ?? item.service_charge).toLocaleString('en-IN')}` : 'Price on request'}
-        </Text>
-        <Text style={{ fontSize: 12, color: '#555' }}>
-          👷 Per job incentive: {(item.incentivePerJob ?? item.incentive_per_job) != null && (item.incentivePerJob ?? item.incentive_per_job) !== '' ? `₹${Number(item.incentivePerJob ?? item.incentive_per_job).toLocaleString('en-IN')}` : '—'}
-        </Text>
+      {/* CRM Details Table */}
+      <View style={styles.infoTable}>
+        <View style={styles.infoRow}>
+          <View style={styles.infoCell}>
+            <Text style={styles.infoCellLabel}>Mobile</Text>
+            <Text style={styles.infoCellValue}>{item.mobileNumber || 'N/A'}</Text>
+          </View>
+          <View style={styles.infoCell}>
+            <Text style={styles.infoCellLabel}>Service</Text>
+            <Text style={styles.infoCellValue}>{item.serviceType || 'N/A'}</Text>
+          </View>
+        </View>
+        <View style={styles.infoRow}>
+          <View style={styles.infoCell}>
+            <Text style={styles.infoCellLabel}>Tank Size</Text>
+            <Text style={styles.infoCellValue}>{item.tankSize || 'N/A'}</Text>
+          </View>
+          <View style={styles.infoCell}>
+            <Text style={styles.infoCellLabel}>Payment</Text>
+            <Text style={[styles.infoCellValue, { color: item.paymentStatus === 'paid' ? '#16a34a' : '#f59e0b' }]}>{item.paymentStatus === 'paid' ? 'Paid' : 'Pending'}</Text>
+          </View>
+        </View>
+        <View style={styles.infoRow}>
+          <View style={styles.infoCell}>
+            <Text style={styles.infoCellLabel}>Charge</Text>
+            <Text style={styles.infoCellValue}>{(item.serviceCharge ?? item.service_charge) > 0 ? `₹${Number(item.serviceCharge ?? item.service_charge).toLocaleString('en-IN')}` : 'On request'}</Text>
+          </View>
+          <View style={styles.infoCell}>
+            <Text style={styles.infoCellLabel}>Incentive/Job</Text>
+            <Text style={styles.infoCellValue}>{(item.incentivePerJob ?? item.incentive_per_job) != null ? `₹${Number(item.incentivePerJob ?? item.incentive_per_job).toLocaleString('en-IN')}` : '—'}</Text>
+          </View>
+        </View>
         {item.scheduledAt && (
-          <Text style={{ fontSize: 11, color: '#6b7280' }}>
-            🗓 {new Date(item.scheduledAt).toLocaleString()}
-          </Text>
+          <View style={styles.infoRowFull}>
+            <Text style={styles.infoCellLabel}>Scheduled</Text>
+            <Text style={styles.infoCellValue}>{new Date(item.scheduledAt).toLocaleDateString()} {new Date(item.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+          </View>
         )}
         {item.nextServiceAt && (
-          <Text style={{ fontSize: 11, color: '#16a34a' }}>
-            🔁 Next cleaning: {new Date(item.nextServiceAt).toLocaleDateString()}
-          </Text>
+          <View style={styles.infoRowFull}>
+            <Text style={styles.infoCellLabel}>Next Cleaning</Text>
+            <Text style={[styles.infoCellValue, { color: '#16a34a' }]}>{new Date(item.nextServiceAt).toLocaleDateString()}</Text>
+          </View>
         )}
       </View>
 
-      {(item.completionPhoto || item.completion_photo) && (
+      {/* Before / After Photos */}
+      {(item.photos?.before?.length > 0 || item.photos?.after?.length > 0 || item.completionPhoto || item.completion_photo) && (
         <View style={{ marginBottom: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#eee' }}>
-          <Text style={{ fontSize: 12, color: '#333', fontWeight: '500', marginBottom: 6 }}>📷 Completion Photo</Text>
-          <CompletionPhotoImage
-            filename={item.completionPhoto || item.completion_photo}
-            getUploadsBaseUrl={getUploadsBaseUrl}
-            style={styles.completionThumb}
-          />
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            {/* Before */}
+            {item.photos?.before?.length > 0 && (
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 11, color: '#f59e0b', fontWeight: '700', marginBottom: 4 }}>BEFORE</Text>
+                {item.photos.before.slice(0, 2).map((p: string, idx: number) => (
+                  <CompletionPhotoImage key={`b-${idx}`} photoPath={p} style={styles.completionThumb} />
+                ))}
+              </View>
+            )}
+            {/* After */}
+            {(item.photos?.after?.length > 0 || item.completionPhoto || item.completion_photo) && (
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 11, color: '#22c55e', fontWeight: '700', marginBottom: 4 }}>AFTER</Text>
+                {item.photos?.after?.length > 0
+                  ? item.photos.after.slice(0, 2).map((p: string, idx: number) => (
+                      <CompletionPhotoImage key={`a-${idx}`} photoPath={p} style={styles.completionThumb} />
+                    ))
+                  : <CompletionPhotoImage photoPath={item.completionPhoto || item.completion_photo} style={styles.completionThumb} />
+                }
+              </View>
+            )}
+          </View>
           {(item.completionPhotoAt || item.completion_photo_at) && (
             <Text style={{ fontSize: 11, color: '#666', marginTop: 4 }}>
-              📅 {new Date(item.completionPhotoAt || item.completion_photo_at).toLocaleDateString()} {new Date(item.completionPhotoAt || item.completion_photo_at).toLocaleTimeString()}
-            </Text>
-          )}
-          {(item.completionLatitude != null || item.completion_latitude != null) && (item.completionLongitude != null || item.completion_longitude != null) && (
-            <Text style={{ fontSize: 11, color: '#666' }}>
-              📍 {Number(item.completionLatitude ?? item.completion_latitude).toFixed(5)}, {Number(item.completionLongitude ?? item.completion_longitude).toFixed(5)}
+              Completed: {new Date(item.completionPhotoAt || item.completion_photo_at).toLocaleDateString()} {new Date(item.completionPhotoAt || item.completion_photo_at).toLocaleTimeString()}
             </Text>
           )}
         </View>
@@ -333,7 +373,7 @@ export default function JobsManagementScreen() {
           }
         </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 
   if (loading) {
@@ -398,13 +438,17 @@ export default function JobsManagementScreen() {
       <Modal
         visible={modalVisible}
         animationType="slide"
-        transparent={true}
         onRequestClose={() => setModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <ScrollView style={styles.modalScroll}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Create New Job</Text>
+        <SafeAreaView style={styles.fullScreenModal}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => { setModalVisible(false); resetForm(); }} style={styles.modalBackBtn}>
+              <Ionicons name="arrow-back" size={24} color="#0f172a" />
+            </TouchableOpacity>
+            <Text style={styles.modalHeaderTitle}>Create New Job</Text>
+            <View style={{ width: 40 }} />
+          </View>
+          <ScrollView style={styles.modalScroll} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
 
               <Text style={styles.label}>Customer Name *</Text>
               <TextInput
@@ -630,9 +674,8 @@ export default function JobsManagementScreen() {
                   )}
                 </TouchableOpacity>
               </View>
-            </View>
           </ScrollView>
-        </View>
+        </SafeAreaView>
       </Modal>
     </SafeAreaView>
   );
@@ -641,7 +684,7 @@ export default function JobsManagementScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#f0f4f8',
   },
   loadingContainer: {
     flex: 1,
@@ -652,16 +695,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: '#fff',
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
   title: {
     fontSize: 17,
-    fontWeight: '600',
-    color: '#1a1a1a',
+    fontWeight: '700',
+    color: '#0f172a',
+    fontFamily: FONT_MEDIUM,
   },
   headerBrand: {
     flex: 1,
@@ -709,16 +758,16 @@ const styles = StyleSheet.create({
   },
   jobCard: {
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 10,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 12,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#e2e8f0',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 3,
   },
   jobHeader: {
     flexDirection: 'row',
@@ -728,9 +777,10 @@ const styles = StyleSheet.create({
   },
   customerName: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#1a1a1a',
+    fontWeight: '700',
+    color: '#0f172a',
     flex: 1,
+    fontFamily: FONT_MEDIUM,
   },
   jobHeaderRight: {
     flexDirection: 'row',
@@ -755,12 +805,14 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#64748b',
     marginBottom: 6,
+    fontFamily: FONT_REGULAR,
   },
   notes: {
     fontSize: 13,
     color: '#64748b',
     fontStyle: 'italic',
     marginBottom: 6,
+    fontFamily: FONT_REGULAR,
   },
   jobFooter: {
     flexDirection: 'row',
@@ -810,31 +862,66 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#8E8E93',
   },
-  modalOverlay: {
+  fullScreenModal: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: '#f0f4f8',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  modalBackBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 20,
+    backgroundColor: '#f1f5f9',
+  },
+  modalHeaderTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#0f172a',
+    fontFamily: FONT_MEDIUM,
   },
   modalScroll: {
     flex: 1,
   },
-  modalContent: {
+  modalFormCard: {
     backgroundColor: '#fff',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    padding: 24,
-    marginTop: 60,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 3,
   },
   modalTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#0f172a',
     marginBottom: 20,
-  },
+    fontFamily: FONT_MEDIUM,
+  }, // kept for backward compat; title now in modalHeaderTitle
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
+    color: '#334155',
     marginBottom: 8,
+    fontFamily: FONT_MEDIUM,
   },
   input: {
     borderWidth: 1,
@@ -960,5 +1047,50 @@ const styles = StyleSheet.create({
   previewMap: {
     width: '100%',
     height: 140,
+  },
+  infoTable: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    overflow: 'hidden',
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#e2e8f0',
+  },
+  infoRowFull: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#e2e8f0',
+  },
+  infoCell: {
+    flex: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRightWidth: StyleSheet.hairlineWidth,
+    borderRightColor: '#e2e8f0',
+  },
+  infoCellLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#94a3b8',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+    fontFamily: FONT_MEDIUM,
+  },
+  infoCellValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#0f172a',
+    fontFamily: FONT_MEDIUM,
   },
 });

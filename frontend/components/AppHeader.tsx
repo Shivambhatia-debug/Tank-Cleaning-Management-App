@@ -1,8 +1,11 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AppLogo from './AppLogo';
 import BrandText from './BrandText';
+
+const FONT_MEDIUM = Platform.select({ ios: 'Avenir Next', android: 'sans-serif-medium', default: 'System' });
+const FONT_REGULAR = Platform.select({ ios: 'Avenir Next', android: 'sans-serif', default: 'System' });
 
 type AppHeaderProps = {
   title?: string;
@@ -35,7 +38,7 @@ export default function AppHeader({
       </View>
       {onLogout ? (
         <TouchableOpacity onPress={onLogout} style={styles.logoutBtn} activeOpacity={0.7}>
-          <Ionicons name="log-out-outline" size={22} color="#FF3B30" />
+          <Ionicons name="log-out-outline" size={22} color="#ef4444" />
         </TouchableOpacity>
       ) : <View style={styles.logoutBtn} />}
     </View>
@@ -46,11 +49,16 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: '#fff',
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
   headerCompact: {
     paddingVertical: 8,
@@ -63,18 +71,19 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   title: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1a1a1a',
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#0f172a',
+    fontFamily: FONT_MEDIUM,
   },
   titleCompact: {
     fontSize: 15,
-    color: '#1a1a1a',
   },
   subtitle: {
     fontSize: 12,
     color: '#64748b',
     marginTop: 1,
+    fontFamily: FONT_REGULAR,
   },
   brandWrap: {
     marginRight: 8,

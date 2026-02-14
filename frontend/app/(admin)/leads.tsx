@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,6 +20,9 @@ import DropdownPicker from '../../components/DropdownPicker';
 import CalendarPicker from '../../components/CalendarPicker';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../utils/api';
+
+const FONT_REGULAR = Platform.select({ ios: 'Avenir Next', android: 'sans-serif', default: 'System' });
+const FONT_MEDIUM = Platform.select({ ios: 'Avenir Next', android: 'sans-serif-medium', default: 'System' });
 
 const SOURCE_OPTIONS = ['Direct Call', 'WhatsApp', 'Facebook', 'Instagram', 'Google', 'Referral', 'Walk-in', 'JustDial', 'Other'];
 const SERVICE_TYPE_OPTIONS = ['Water Tank', 'Sump Cleaning', 'Overhead Tank', 'Underground Tank', 'RO Tank', 'Aquarium Tank', 'Septic Tank', 'Swimming Pool', 'Other'];
@@ -110,6 +114,8 @@ export default function LeadsScreen() {
 
   const [logText, setLogText] = useState('');
   const [logNextDate, setLogNextDate] = useState('');
+  const [logQuotedPrice, setLogQuotedPrice] = useState('');
+  const [logFinalPrice, setLogFinalPrice] = useState('');
   const [addingLog, setAddingLog] = useState(false);
   const [creatingJobFromLead, setCreatingJobFromLead] = useState(false);
   const [detailJobStatus, setDetailJobStatus] = useState<(typeof JOB_STATUS_OPTIONS)[number]>('New Lead');
@@ -118,6 +124,9 @@ export default function LeadsScreen() {
   const [detailLng, setDetailLng] = useState('');
   const [updatingLocation, setUpdatingLocation] = useState(false);
   const [selectedJobStaffIds, setSelectedJobStaffIds] = useState<string[]>([]);
+  const [editLeadMode, setEditLeadMode] = useState(false);
+  const [editLeadForm, setEditLeadForm] = useState<Record<string, string>>({});
+  const [savingEdit, setSavingEdit] = useState(false);
 
   useEffect(() => {
     loadLeads();
@@ -237,14 +246,36 @@ export default function LeadsScreen() {
   const openLeadDetail = async (lead: Lead) => {
     try {
       const res = await api.get<Lead>(`/leads/${lead._id}`);
-      setSelectedLead(res.data);
-      setDetailJobStatus((res.data.jobStatus as any) || 'New Lead');
-      setDetailPaymentStatus((res.data.paymentStatus as any) || 'Pending');
-      const lat = (res.data as any).latitude;
-      const lng = (res.data as any).longitude;
+      const d = res.data;
+      setSelectedLead(d);
+      setDetailJobStatus((d.jobStatus as any) || 'New Lead');
+      setDetailPaymentStatus((d.paymentStatus as any) || 'Pending');
+      const lat = (d as any).latitude;
+      const lng = (d as any).longitude;
       setDetailLat(lat != null && !Number.isNaN(lat) ? String(lat) : '');
       setDetailLng(lng != null && !Number.isNaN(lng) ? String(lng) : '');
       setSelectedJobStaffIds([]);
+      setEditLeadMode(false);
+      setEditLeadForm({
+        customerName: d.customerName || '',
+        mobileNumber: d.mobileNumber || '',
+        address: (d as any).address || '',
+        area: (d as any).area || '',
+        source: (d as any).source || 'Direct Call',
+        whatsappNumber: (d as any).whatsappNumber || '',
+        serviceType: (d as any).serviceType || 'Water Tank',
+        tankSizeLtr: (d as any).tankSizeLtr != null ? String((d as any).tankSizeLtr) : '',
+        numberOfTanks: (d as any).numberOfTanks != null ? String((d as any).numberOfTanks) : '',
+        quotedPrice: (d as any).quotedPrice != null ? String((d as any).quotedPrice) : '',
+        finalPrice: (d as any).finalPrice != null ? String((d as any).finalPrice) : '',
+        bookingDate: (d as any).bookingDate ? (typeof (d as any).bookingDate === 'string' ? (d as any).bookingDate.slice(0, 10) : new Date((d as any).bookingDate).toISOString().slice(0, 10)) : '',
+        timeSlot: (d as any).timeSlot || '',
+        paymentStatus: (d as any).paymentStatus || 'Pending',
+        paymentMode: (d as any).paymentMode || 'pending',
+        notes: (d as any).notes || '',
+      });
+      setLogQuotedPrice('');
+      setLogFinalPrice('');
       setDetailModalVisible(true);
     } catch (err: any) {
       console.error('Load lead detail error', err.response?.data || err.message);
@@ -297,6 +328,52 @@ export default function LeadsScreen() {
     }
   };
 
+  const handleSaveEditLead = async () => {
+    if (!selectedLead) return;
+    const name = (editLeadForm.customerName || '').trim();
+    const mobile = (editLeadForm.mobileNumber || '').replace(/\D/g, '').slice(0, 10);
+    if (!name || !mobile) {
+      Alert.alert('Missing info', 'Customer name and 10 digit mobile are required');
+      return;
+    }
+    if (mobile.length !== 10) {
+      Alert.alert('Invalid mobile', 'Enter exactly 10 digit mobile number');
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      const payload: any = {
+        customerName: name,
+        mobileNumber: mobile,
+        address: (editLeadForm.address || '').trim(),
+        source: editLeadForm.source || 'Direct Call',
+        area: (editLeadForm.area || '').trim(),
+        whatsappNumber: (editLeadForm.whatsappNumber || '').replace(/\D/g, '').slice(0, 10) || undefined,
+        serviceType: (editLeadForm.serviceType || '').trim() || undefined,
+        tankSizeLtr: editLeadForm.tankSizeLtr ? Number(editLeadForm.tankSizeLtr) || 0 : undefined,
+        numberOfTanks: editLeadForm.numberOfTanks ? Number(editLeadForm.numberOfTanks) || 0 : undefined,
+        quotedPrice: editLeadForm.quotedPrice ? Number(editLeadForm.quotedPrice) || 0 : undefined,
+        finalPrice: editLeadForm.finalPrice ? Number(editLeadForm.finalPrice) || 0 : undefined,
+        bookingDate: editLeadForm.bookingDate || undefined,
+        timeSlot: (editLeadForm.timeSlot || '').trim() || undefined,
+        jobStatus: detailJobStatus,
+        paymentStatus: detailPaymentStatus,
+        paymentMode: (editLeadForm.paymentMode || 'pending').trim(),
+        notes: (editLeadForm.notes || '').trim() || undefined,
+      };
+      const res = await api.put<Lead>(`/leads/${selectedLead._id}`, payload);
+      setSelectedLead(res.data);
+      setEditLeadMode(false);
+      loadLeads();
+      Alert.alert('Saved', 'Lead details updated.');
+    } catch (err: any) {
+      console.error('Edit lead error', err.response?.data || err.message);
+      Alert.alert('Error', err.response?.data?.message || 'Failed to update lead');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   const handleAddLog = async () => {
     if (!selectedLead) return;
     const notes = logText.trim();
@@ -306,18 +383,61 @@ export default function LeadsScreen() {
     }
     setAddingLog(true);
     try {
+      const quotedNum = logQuotedPrice.trim() ? Number(logQuotedPrice) : null;
+      const finalNum = logFinalPrice.trim() ? Number(logFinalPrice) : null;
+      const priceUpdates: any = {};
+      if (quotedNum != null && !Number.isNaN(quotedNum)) priceUpdates.quotedPrice = quotedNum;
+      if (finalNum != null && !Number.isNaN(finalNum)) priceUpdates.finalPrice = finalNum;
+      if (Object.keys(priceUpdates).length > 0) {
+        await api.put(`/leads/${selectedLead._id}`, priceUpdates);
+      }
       const payload: any = { notes };
       if (logNextDate) payload.nextFollowUpAt = logNextDate;
       const res = await api.post<Lead>(`/leads/${selectedLead._id}/logs`, payload);
       setSelectedLead(res.data);
       setLogText('');
       setLogNextDate('');
+      setLogQuotedPrice('');
+      setLogFinalPrice('');
+      if (quotedNum != null || finalNum != null) loadLeads();
     } catch (err: any) {
       console.error('Add log error', err.response?.data || err.message);
       Alert.alert('Error', err.response?.data?.message || 'Failed to add log');
     } finally {
       setAddingLog(false);
     }
+  };
+
+  const handleDeleteLead = () => {
+    if (!selectedLead) return;
+    const name = selectedLead.customerName || 'this lead';
+    Alert.alert(
+      'Delete lead',
+      `Delete "${name}"? This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await api.delete(`/leads/${selectedLead._id}`);
+              setDetailModalVisible(false);
+              setSelectedLead(null);
+              loadLeads();
+              Alert.alert('Done', 'Lead deleted.');
+            } catch (err: any) {
+              const msg = err.response?.data?.message || err.message || 'Failed to delete lead';
+              Alert.alert('Error', msg);
+              if (err.response?.status === 404) {
+                setDetailModalVisible(false);
+                loadLeads();
+              }
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleCreateJobFromLead = async () => {
@@ -497,16 +617,21 @@ export default function LeadsScreen() {
       <Modal
         visible={createModalVisible}
         animationType="slide"
-        transparent
         onRequestClose={() => setCreateModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>New lead</Text>
-            <ScrollView
-              style={{ maxHeight: 480 }}
-              showsVerticalScrollIndicator={false}
-            >
+        <SafeAreaView style={styles.fullScreenModal}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setCreateModalVisible(false)} style={styles.modalBackBtn}>
+              <Ionicons name="arrow-back" size={24} color="#0f172a" />
+            </TouchableOpacity>
+            <Text style={styles.modalHeaderTitle}>New Lead</Text>
+            <View style={{ width: 40 }} />
+          </View>
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+            showsVerticalScrollIndicator={false}
+          >
               <Text style={styles.label}>Customer name *</Text>
               <TextInput
                 style={styles.input}
@@ -746,50 +871,139 @@ export default function LeadsScreen() {
                   )}
                 </TouchableOpacity>
               </View>
-            </ScrollView>
-          </View>
-        </View>
+          </ScrollView>
+        </SafeAreaView>
       </Modal>
 
       {/* Lead detail + discussion log */}
       <Modal
         visible={detailModalVisible}
         animationType="slide"
-        transparent
         onRequestClose={() => setDetailModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { maxHeight: '90%' }]}>
-            {selectedLead ? (
-              <ScrollView
-                style={{ maxHeight: 520 }}
-                showsVerticalScrollIndicator={false}
-              >
-                <Text style={styles.modalTitle}>{selectedLead.customerName}</Text>
-                <Text style={styles.detailLine}>📱 {selectedLead.mobileNumber}</Text>
-                {selectedLead.address ? (
-                  <Text style={styles.detailLine}>📍 {selectedLead.address}</Text>
-                ) : null}
-                <Text style={styles.detailLine}>
-                  Source: <Text style={styles.leadMetaBold}>{selectedLead.source}</Text>
-                </Text>
-                <Text style={styles.detailLine}>
-                  Status: <Text style={styles.leadMetaBold}>{selectedLead.status}</Text>
-                </Text>
-                <Text style={styles.detailLine}>
-                  Job status:{' '}
-                  <Text style={styles.leadMetaBold}>{detailJobStatus}</Text>
-                </Text>
-                <Text style={styles.detailLine}>
-                  Payment status:{' '}
-                  <Text style={styles.leadMetaBold}>{detailPaymentStatus}</Text>
-                </Text>
-                {selectedLead.nextFollowUpAt && (
-                  <Text style={styles.detailLine}>
-                    Next follow‑up:{' '}
-                    {new Date(selectedLead.nextFollowUpAt).toLocaleString()}
-                  </Text>
-                )}
+        <SafeAreaView style={styles.fullScreenModal}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setDetailModalVisible(false)} style={styles.modalBackBtn}>
+              <Ionicons name="arrow-back" size={24} color="#0f172a" />
+            </TouchableOpacity>
+            <Text style={styles.modalHeaderTitle}>Lead Details</Text>
+            <View style={{ width: 40 }} />
+          </View>
+          {selectedLead ? (
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+              showsVerticalScrollIndicator={false}
+            >
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <Text style={styles.modalTitle}>{selectedLead.customerName}</Text>
+                  <TouchableOpacity
+                    style={[styles.modalBtn, editLeadMode ? styles.convertBtn : { backgroundColor: '#64748b', paddingHorizontal: 12 }]}
+                    onPress={() => setEditLeadMode(!editLeadMode)}
+                  >
+                    <Text style={styles.modalBtnPrimaryText}>{editLeadMode ? 'Cancel edit' : 'Edit lead'}</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {editLeadMode ? (
+                  <View style={styles.addLogSection}>
+                    <Text style={styles.label}>Customer name *</Text>
+                    <TextInput style={styles.input} placeholder="Full name" placeholderTextColor="#9CA3AF" value={editLeadForm.customerName} onChangeText={(t) => setEditLeadForm({ ...editLeadForm, customerName: t })} />
+                    <Text style={styles.label}>Mobile *</Text>
+                    <TextInput style={styles.input} placeholder="10 digit" placeholderTextColor="#9CA3AF" keyboardType="phone-pad" maxLength={10} value={editLeadForm.mobileNumber} onChangeText={(t) => setEditLeadForm({ ...editLeadForm, mobileNumber: t.replace(/\D/g, '').slice(0, 10) })} />
+                    <Text style={styles.label}>Address</Text>
+                    <TextInput style={[styles.input, styles.textArea]} placeholder="Address" placeholderTextColor="#9CA3AF" multiline numberOfLines={2} value={editLeadForm.address} onChangeText={(t) => setEditLeadForm({ ...editLeadForm, address: t })} />
+                    <View style={styles.row2}>
+                      <View style={styles.col2}>
+                        <Text style={styles.label}>Quoted (₹)</Text>
+                        <TextInput style={styles.input} placeholder="e.g. 800" placeholderTextColor="#9CA3AF" keyboardType="numeric" value={editLeadForm.quotedPrice} onChangeText={(t) => setEditLeadForm({ ...editLeadForm, quotedPrice: t })} />
+                      </View>
+                      <View style={styles.spacer2} />
+                      <View style={styles.col2}>
+                        <Text style={styles.label}>Final (₹)</Text>
+                        <TextInput style={styles.input} placeholder="e.g. 700" placeholderTextColor="#9CA3AF" keyboardType="numeric" value={editLeadForm.finalPrice} onChangeText={(t) => setEditLeadForm({ ...editLeadForm, finalPrice: t })} />
+                      </View>
+                    </View>
+                    <DropdownPicker label="Service type" placeholder="Select" value={editLeadForm.serviceType} options={SERVICE_TYPE_OPTIONS} onSelect={(v) => setEditLeadForm({ ...editLeadForm, serviceType: v })} />
+                    <View style={styles.row2}>
+                      <View style={styles.col2}>
+                        <Text style={styles.label}>Tank (Ltr)</Text>
+                        <TextInput style={styles.input} placeholder="e.g. 500" placeholderTextColor="#9CA3AF" keyboardType="numeric" value={editLeadForm.tankSizeLtr} onChangeText={(t) => setEditLeadForm({ ...editLeadForm, tankSizeLtr: t })} />
+                      </View>
+                      <View style={styles.spacer2} />
+                      <View style={styles.col2}>
+                        <CalendarPicker label="Booking date" placeholder="Date" value={editLeadForm.bookingDate} onChange={(d) => setEditLeadForm({ ...editLeadForm, bookingDate: d })} small />
+                      </View>
+                    </View>
+                    <Text style={styles.label}>Notes</Text>
+                    <TextInput style={[styles.input, styles.textArea]} placeholder="Notes" placeholderTextColor="#9CA3AF" multiline numberOfLines={2} value={editLeadForm.notes} onChangeText={(t) => setEditLeadForm({ ...editLeadForm, notes: t })} />
+                    <TouchableOpacity style={[styles.modalBtn, styles.modalBtnPrimary]} onPress={handleSaveEditLead} disabled={savingEdit}>
+                      {savingEdit ? <ActivityIndicator color="#fff" /> : <Text style={styles.modalBtnPrimaryText}>Save changes</Text>}
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <>
+                <View style={styles.detailCard}>
+                  <Text style={styles.detailCardTitle}>CUSTOMER INFORMATION</Text>
+                  <View style={styles.detailInfoRow}>
+                    <Text style={styles.detailInfoLabel}>Name</Text>
+                    <Text style={styles.detailInfoValue}>{selectedLead.customerName}</Text>
+                  </View>
+                  <View style={styles.detailInfoRow}>
+                    <Text style={styles.detailInfoLabel}>Mobile</Text>
+                    <Text style={styles.detailInfoValue}>{selectedLead.mobileNumber}</Text>
+                  </View>
+                  {selectedLead.address ? (
+                    <View style={styles.detailInfoRow}>
+                      <Text style={styles.detailInfoLabel}>Address</Text>
+                      <Text style={[styles.detailInfoValue, { flex: 1, textAlign: 'right' }]}>{selectedLead.address}</Text>
+                    </View>
+                  ) : null}
+                  {(selectedLead as any).area ? (
+                    <View style={styles.detailInfoRow}>
+                      <Text style={styles.detailInfoLabel}>Area</Text>
+                      <Text style={styles.detailInfoValue}>{(selectedLead as any).area}</Text>
+                    </View>
+                  ) : null}
+                  <View style={styles.detailInfoRow}>
+                    <Text style={styles.detailInfoLabel}>Source</Text>
+                    <Text style={styles.detailInfoValue}>{selectedLead.source || 'Direct Call'}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.detailCard}>
+                  <Text style={styles.detailCardTitle}>STATUS & PRICING</Text>
+                  <View style={styles.detailInfoRow}>
+                    <Text style={styles.detailInfoLabel}>Lead Status</Text>
+                    <Text style={[styles.detailInfoValue, { color: '#0EA5E9' }]}>{selectedLead.status}</Text>
+                  </View>
+                  <View style={styles.detailInfoRow}>
+                    <Text style={styles.detailInfoLabel}>Job Status</Text>
+                    <Text style={styles.detailInfoValue}>{detailJobStatus}</Text>
+                  </View>
+                  <View style={styles.detailInfoRow}>
+                    <Text style={styles.detailInfoLabel}>Payment</Text>
+                    <Text style={[styles.detailInfoValue, { color: detailPaymentStatus === 'Received' ? '#16a34a' : '#f59e0b' }]}>{detailPaymentStatus}</Text>
+                  </View>
+                  {(selectedLead as any).quotedPrice != null && (selectedLead as any).quotedPrice !== '' && (
+                    <View style={styles.detailInfoRow}>
+                      <Text style={styles.detailInfoLabel}>Quoted Price</Text>
+                      <Text style={styles.detailInfoValue}>₹{(selectedLead as any).quotedPrice}</Text>
+                    </View>
+                  )}
+                  {(selectedLead as any).finalPrice != null && (selectedLead as any).finalPrice !== '' && (
+                    <View style={styles.detailInfoRow}>
+                      <Text style={styles.detailInfoLabel}>Final Price</Text>
+                      <Text style={[styles.detailInfoValue, { fontWeight: '700', color: '#16a34a' }]}>₹{(selectedLead as any).finalPrice}</Text>
+                    </View>
+                  )}
+                  {selectedLead.nextFollowUpAt && (
+                    <View style={styles.detailInfoRow}>
+                      <Text style={styles.detailInfoLabel}>Next Follow-up</Text>
+                      <Text style={[styles.detailInfoValue, { color: '#f59e0b' }]}>{new Date(selectedLead.nextFollowUpAt).toLocaleDateString()}</Text>
+                    </View>
+                  )}
+                </View>
 
                 <View style={styles.statusPillsRow}>
                   {JOB_STATUS_OPTIONS.map((st) => {
@@ -951,16 +1165,41 @@ export default function LeadsScreen() {
                 </View>
 
                 <View style={styles.addLogSection}>
-                  <Text style={styles.label}>Add discussion</Text>
+                  <Text style={styles.label}>Add discussion (follow-up)</Text>
                   <TextInput
                     style={[styles.input, styles.textArea]}
-                    placeholder="Notes from call / visit"
+                    placeholder="Notes from call / visit – price negotiated, etc."
                     placeholderTextColor="#9CA3AF"
                     multiline
                     numberOfLines={2}
                     value={logText}
                     onChangeText={setLogText}
                   />
+                  <View style={styles.row2}>
+                    <View style={styles.col2}>
+                      <Text style={styles.labelSmall}>Quoted price (₹) – optional</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="e.g. 800"
+                        placeholderTextColor="#9CA3AF"
+                        keyboardType="numeric"
+                        value={logQuotedPrice}
+                        onChangeText={setLogQuotedPrice}
+                      />
+                    </View>
+                    <View style={styles.spacer2} />
+                    <View style={styles.col2}>
+                      <Text style={styles.labelSmall}>Final price (₹) – optional</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="e.g. 700"
+                        placeholderTextColor="#9CA3AF"
+                        keyboardType="numeric"
+                        value={logFinalPrice}
+                        onChangeText={setLogFinalPrice}
+                      />
+                    </View>
+                  </View>
                   <CalendarPicker
                     label="Next follow-up date (optional)"
                     placeholder="Select follow-up date"
@@ -992,19 +1231,22 @@ export default function LeadsScreen() {
                     )}
                   </TouchableOpacity>
                 </View>
-              </ScrollView>
-            ) : (
-              <ActivityIndicator size="large" color="#007AFF" />
-            )}
-
+                  </>
+                )}
             <TouchableOpacity
-              style={[styles.modalBtn, styles.modalBtnCancel, { marginTop: 12 }]}
-              onPress={() => setDetailModalVisible(false)}
+              style={styles.deleteLeadBtn}
+              onPress={handleDeleteLead}
             >
-              <Text style={styles.modalBtnCancelText}>Close</Text>
+              <Ionicons name="trash-outline" size={18} color="#dc2626" />
+              <Text style={styles.deleteLeadBtnText}>Delete lead</Text>
             </TouchableOpacity>
-          </View>
-        </View>
+          </ScrollView>
+          ) : (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+              <ActivityIndicator size="large" color="#007AFF" />
+            </View>
+          )}
+        </SafeAreaView>
       </Modal>
     </SafeAreaView>
   );
@@ -1330,6 +1572,93 @@ const styles = StyleSheet.create({
   statusPillTextActive: {
     color: '#0369a1',
     fontWeight: '600',
+  },
+  fullScreenModal: {
+    flex: 1,
+    backgroundColor: '#f0f4f8',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  modalBackBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 20,
+    backgroundColor: '#f1f5f9',
+  },
+  modalHeaderTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  detailCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  detailCardTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#94a3b8',
+    letterSpacing: 0.5,
+    marginBottom: 10,
+  },
+  detailInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#f1f5f9',
+  },
+  detailInfoLabel: {
+    fontSize: 13,
+    color: '#64748b',
+    fontWeight: '500',
+  },
+  detailInfoValue: {
+    fontSize: 13,
+    color: '#0f172a',
+    fontWeight: '600',
+  },
+  deleteLeadBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    marginTop: 12,
+    backgroundColor: '#fef2f2',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  deleteLeadBtnText: {
+    color: '#dc2626',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 8,
   },
 });
 

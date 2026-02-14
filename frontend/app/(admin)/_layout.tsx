@@ -1,5 +1,8 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { Platform } from 'react-native';
+
+const FONT_MEDIUM = Platform.select({ ios: 'Avenir Next', android: 'sans-serif-medium', default: 'System' });
 
 export default function AdminLayout() {
   return (
@@ -9,13 +12,18 @@ export default function AdminLayout() {
         tabBarActiveTintColor: '#0EA5E9',
         tabBarInactiveTintColor: '#94A3B8',
         tabBarStyle: {
-          borderTopColor: '#E8E8ED',
-          paddingBottom: 8,
+          borderTopColor: '#e2e8f0',
+          paddingBottom: Platform.OS === 'ios' ? 24 : 8,
           paddingTop: 8,
-          height: 60,
+          height: Platform.OS === 'ios' ? 80 : 60,
           backgroundColor: '#fff',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -1 },
+          shadowOpacity: 0.05,
+          shadowRadius: 4,
+          elevation: 4,
         },
-        tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '600', fontFamily: FONT_MEDIUM },
       }}
     >
       <Tabs.Screen
@@ -81,6 +89,7 @@ export default function AdminLayout() {
           ),
         }}
       />
+      <Tabs.Screen name="job-detail" options={{ href: null }} />
     </Tabs>
   );
 }

@@ -13,14 +13,25 @@ import {
   Alert,
   ScrollView,
   Image,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import api, { getUploadsBaseUrl } from '../../utils/api';
+import { Ionicons } from '@expo/vector-icons';
+import api, { resolvePhotoUrl } from '../../utils/api';
 import BrandText from '../../components/BrandText';
 import CalendarPicker from '../../components/CalendarPicker';
 
 const STAFF_TYPE_OPTIONS = ['Full Time', 'Part Time'] as const;
 const STAFF_STATUS_OPTIONS = ['Active', 'Inactive', 'Terminated'] as const;
+const FONT_REGULAR = Platform.select({ ios: 'Avenir Next', android: 'sans-serif', default: 'System' });
+const FONT_MEDIUM = Platform.select({ ios: 'Avenir Next', android: 'sans-serif-medium', default: 'System' });
+
+const formatCurrencyOrDash = (value: any) => {
+  if (value === null || value === undefined || value === '') return '—';
+  const num = Number(value);
+  if (Number.isNaN(num)) return '—';
+  return `₹${num.toLocaleString('en-IN')}`;
+};
 
 export default function StaffManagementScreen() {
   const { openStaffId } = useLocalSearchParams<{ openStaffId?: string }>();
@@ -256,13 +267,17 @@ export default function StaffManagementScreen() {
       <Modal
         visible={modalVisible}
         animationType="slide"
-        transparent={true}
         onRequestClose={() => setModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Add New Staff</Text>
-            <ScrollView style={{ maxHeight: 480 }} showsVerticalScrollIndicator={false}>
+        <SafeAreaView style={styles.fullScreenModal}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.modalBackBtn}>
+              <Ionicons name="arrow-back" size={24} color="#0f172a" />
+            </TouchableOpacity>
+            <Text style={styles.modalHeaderTitle}>Add New Staff</Text>
+            <View style={{ width: 40 }} />
+          </View>
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
               <TextInput
                 style={styles.input}
                 placeholder="Staff Name"
@@ -467,91 +482,123 @@ export default function StaffManagementScreen() {
                   )}
                 </TouchableOpacity>
               </View>
-            </ScrollView>
-          </View>
-        </View>
+          </ScrollView>
+        </SafeAreaView>
       </Modal>
 
       <Modal
         visible={detailModalVisible}
-        transparent
-        animationType="fade"
+        animationType="slide"
         onRequestClose={() => setDetailModalVisible(false)}
       >
-        <TouchableOpacity
-          style={styles.detailOverlay}
-          activeOpacity={1}
-          onPress={() => setDetailModalVisible(false)}
-        >
-          <View style={styles.detailModal}>
-            <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
-              <Text style={styles.detailTitle}>Staff details</Text>
+        <SafeAreaView style={styles.fullScreenModal}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setDetailModalVisible(false)} style={styles.modalBackBtn}>
+              <Ionicons name="arrow-back" size={24} color="#0f172a" />
+            </TouchableOpacity>
+            <Text style={styles.modalHeaderTitle}>Staff Details</Text>
+            <View style={{ width: 40 }} />
+          </View>
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
               {selectedStaff && (
-                <View style={styles.detailBody}>
-                  <Text style={styles.detailRow}><Text style={styles.detailLabel}>Name:</Text> {selectedStaff.name}</Text>
-                  <Text style={styles.detailRow}><Text style={styles.detailLabel}>Phone:</Text> {selectedStaff.phone}</Text>
-                  <Text style={styles.detailRow}><Text style={styles.detailLabel}>Password:</Text> {selectedStaff.plainPasswordForAdmin || '—'}</Text>
-                  <Text style={styles.detailRow}><Text style={styles.detailLabel}>Business:</Text> {selectedStaff.businessName || '—'}</Text>
-                  <Text style={styles.detailRow}><Text style={styles.detailLabel}>Location:</Text> {selectedStaff.location || '—'}</Text>
-                  {(selectedStaff.defaultPerJobIncentive != null && selectedStaff.defaultPerJobIncentive !== '') && (
-                    <Text style={styles.detailRow}><Text style={styles.detailLabel}>Default per job incentive:</Text> ₹{Number(selectedStaff.defaultPerJobIncentive).toLocaleString('en-IN')}</Text>
-                  )}
-                  <View style={[styles.detailBadge, { backgroundColor: selectedStaff.isActive ? '#34C759' : '#FF3B30' }]}>
-                    <Text style={styles.detailBadgeText}>{selectedStaff.isActive ? 'Active' : 'Inactive'}</Text>
-                  </View>
+                <>
+                <View style={[styles.staffDetailBadge, { backgroundColor: selectedStaff.isActive ? '#dcfce7' : '#fee2e2', borderColor: selectedStaff.isActive ? '#86efac' : '#fca5a5' }]}>
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: selectedStaff.isActive ? '#166534' : '#991b1b' }}>
+                    {selectedStaff.isActive ? '● Active' : '● Inactive'}
+                  </Text>
+                </View>
 
-                  <View style={styles.statsBox}>
-                    <Text style={styles.statsTitle}>Performance (auto calculated)</Text>
-                    {loadingStats && (
-                      <Text style={styles.statsLine}>Loading…</Text>
-                    )}
-                    {!!staffStats && !loadingStats && (
-                      <>
-                        <Text style={styles.statsLine}>
-                          Total jobs: {staffStats.totalJobs} • Completed: {staffStats.completedJobs} ({staffStats.completionRate}%)
-                        </Text>
-                        <Text style={styles.statsLine}>
-                          Revenue (from jobs): ₹{(staffStats.totalRevenue ?? 0).toLocaleString('en-IN')} total • ₹{(staffStats.monthlyRevenue ?? 0).toLocaleString('en-IN')} this month
-                        </Text>
-                        <Text style={styles.statsLine}>
-                          Per‑job incentive earned: ₹{(staffStats.totalIncentive ?? 0).toLocaleString('en-IN')} total • ₹{(staffStats.monthlyIncentive ?? 0).toLocaleString('en-IN')} this month
-                        </Text>
-                      </>
-                    )}
-                  </View>
-
-                  {staffJobs.filter((j: any) => j.status === 'completed' && (j.completionPhoto || j.completion_photo)).length > 0 && (
-                    <View style={styles.statsBox}>
-                      <Text style={styles.statsTitle}>📷 Completion photos (from jobs)</Text>
-                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
-                        {staffJobs
-                          .filter((j: any) => j.status === 'completed' && (j.completionPhoto || j.completion_photo))
-                          .slice(0, 6)
-                          .map((j: any) => (
-                            <Image
-                              key={j._id}
-                              source={{ uri: `${getUploadsBaseUrl()}/uploads/${j.completionPhoto || j.completion_photo}` }}
-                              style={{ width: 72, height: 72, borderRadius: 8, backgroundColor: '#eee' }}
-                              resizeMode="cover"
-                            />
-                          ))}
-                      </View>
-                    </View>
+                <View style={styles.staffDetailCard}>
+                  <Text style={styles.staffDetailCardTitle}>PERSONAL INFORMATION</Text>
+                  <View style={styles.staffDetailInfoRow}><Text style={styles.staffDetailInfoLabel}>Name</Text><Text style={styles.staffDetailInfoValue}>{selectedStaff.name}</Text></View>
+                  <View style={styles.staffDetailInfoRow}><Text style={styles.staffDetailInfoLabel}>Phone</Text><Text style={styles.staffDetailInfoValue}>{selectedStaff.phone}</Text></View>
+                  <View style={styles.staffDetailInfoRow}><Text style={styles.staffDetailInfoLabel}>Password</Text><Text style={styles.staffDetailInfoValue}>{selectedStaff.plainPasswordForAdmin || '—'}</Text></View>
+                  <View style={styles.staffDetailInfoRow}><Text style={styles.staffDetailInfoLabel}>Business</Text><Text style={styles.staffDetailInfoValue}>{selectedStaff.businessName || '—'}</Text></View>
+                  <View style={styles.staffDetailInfoRow}><Text style={styles.staffDetailInfoLabel}>Location</Text><Text style={[styles.staffDetailInfoValue, { flex: 1, textAlign: 'right' }]}>{selectedStaff.location || '—'}</Text></View>
+                </View>
+                <View style={styles.staffDetailCard}>
+                  <Text style={styles.staffDetailCardTitle}>COMPENSATION</Text>
+                  <View style={styles.staffDetailInfoRow}><Text style={styles.staffDetailInfoLabel}>Fixed Salary</Text><Text style={styles.staffDetailInfoValue}>{formatCurrencyOrDash(selectedStaff.fixedSalary)}</Text></View>
+                  <View style={styles.staffDetailInfoRow}><Text style={styles.staffDetailInfoLabel}>Per Tank Incentive</Text><Text style={styles.staffDetailInfoValue}>{formatCurrencyOrDash(selectedStaff.perTankIncentive)}</Text></View>
+                  <View style={styles.staffDetailInfoRow}><Text style={styles.staffDetailInfoLabel}>Default Per Job Incentive</Text><Text style={styles.staffDetailInfoValue}>{formatCurrencyOrDash(selectedStaff.defaultPerJobIncentive)}</Text></View>
+                  {selectedStaff.hasBike && (
+                    <View style={styles.staffDetailInfoRow}><Text style={styles.staffDetailInfoLabel}>Fuel Allowance</Text><Text style={styles.staffDetailInfoValue}>{formatCurrencyOrDash(selectedStaff.fuelAllowance)}</Text></View>
                   )}
                 </View>
+
+                <View style={styles.staffDetailCard}>
+                  <Text style={styles.staffDetailCardTitle}>PERFORMANCE</Text>
+                  {loadingStats && (
+                    <ActivityIndicator size="small" color="#0EA5E9" style={{ marginVertical: 12 }} />
+                  )}
+                  {!!staffStats && !loadingStats && (
+                    <>
+                      <View style={styles.staffStatsGrid}>
+                        <View style={styles.staffStatBox}>
+                          <Text style={styles.staffStatNumber}>{staffStats.totalJobs}</Text>
+                          <Text style={styles.staffStatLabel}>Total Jobs</Text>
+                        </View>
+                        <View style={styles.staffStatBox}>
+                          <Text style={styles.staffStatNumber}>{staffStats.completedJobs}</Text>
+                          <Text style={styles.staffStatLabel}>Completed</Text>
+                        </View>
+                        <View style={styles.staffStatBox}>
+                          <Text style={styles.staffStatNumber}>{staffStats.completionRate}%</Text>
+                          <Text style={styles.staffStatLabel}>Rate</Text>
+                        </View>
+                      </View>
+                      <View style={styles.staffDetailInfoRow}><Text style={styles.staffDetailInfoLabel}>Total Revenue</Text><Text style={[styles.staffDetailInfoValue, { color: '#16a34a' }]}>₹{(staffStats.totalRevenue ?? 0).toLocaleString('en-IN')}</Text></View>
+                      <View style={styles.staffDetailInfoRow}><Text style={styles.staffDetailInfoLabel}>This Month Revenue</Text><Text style={[styles.staffDetailInfoValue, { color: '#16a34a' }]}>₹{(staffStats.monthlyRevenue ?? 0).toLocaleString('en-IN')}</Text></View>
+                      <View style={styles.staffDetailInfoRow}><Text style={styles.staffDetailInfoLabel}>Total Incentive</Text><Text style={[styles.staffDetailInfoValue, { color: '#0EA5E9' }]}>₹{(staffStats.totalIncentive ?? 0).toLocaleString('en-IN')}</Text></View>
+                      <View style={styles.staffDetailInfoRow}><Text style={styles.staffDetailInfoLabel}>This Month Incentive</Text><Text style={[styles.staffDetailInfoValue, { color: '#0EA5E9' }]}>₹{(staffStats.monthlyIncentive ?? 0).toLocaleString('en-IN')}</Text></View>
+                    </>
+                  )}
+                </View>
+
+                  {staffJobs.filter((j: any) => j.photos?.before?.length || j.photos?.after?.length || j.completionPhoto || j.completion_photo).length > 0 && (
+                    <View style={styles.statsBox}>
+                      <Text style={styles.statsTitle}>Job Photos (Before / After)</Text>
+                      {staffJobs
+                        .filter((j: any) => j.photos?.before?.length || j.photos?.after?.length || j.completionPhoto || j.completion_photo)
+                        .slice(0, 4)
+                        .map((j: any) => (
+                          <View key={j._id} style={{ marginTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#e2e8f0', paddingTop: 8 }}>
+                            <Text style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontFamily: FONT_REGULAR }}>{j.customerName}</Text>
+                            <View style={{ flexDirection: 'row', gap: 8 }}>
+                              {j.photos?.before?.slice(0, 1).map((p: string, i: number) => (
+                                <View key={`b${i}`}>
+                                  <Text style={{ fontSize: 10, color: '#f59e0b', fontWeight: '700', marginBottom: 2 }}>BEFORE</Text>
+                                  <Image source={{ uri: resolvePhotoUrl(p) || '' }} style={{ width: 64, height: 50, borderRadius: 6, backgroundColor: '#f1f5f9' }} resizeMode="cover" />
+                                </View>
+                              ))}
+                              {(j.photos?.after?.slice(0, 1) || []).map((p: string, i: number) => (
+                                <View key={`a${i}`}>
+                                  <Text style={{ fontSize: 10, color: '#22c55e', fontWeight: '700', marginBottom: 2 }}>AFTER</Text>
+                                  <Image source={{ uri: resolvePhotoUrl(p) || '' }} style={{ width: 64, height: 50, borderRadius: 6, backgroundColor: '#f1f5f9' }} resizeMode="cover" />
+                                </View>
+                              ))}
+                              {!j.photos?.after?.length && (j.completionPhoto || j.completion_photo) && (
+                                <View>
+                                  <Text style={{ fontSize: 10, color: '#22c55e', fontWeight: '700', marginBottom: 2 }}>AFTER</Text>
+                                  <Image source={{ uri: resolvePhotoUrl(j.completionPhoto || j.completion_photo) || '' }} style={{ width: 64, height: 50, borderRadius: 6, backgroundColor: '#f1f5f9' }} resizeMode="cover" />
+                                </View>
+                              )}
+                            </View>
+                          </View>
+                        ))}
+                    </View>
+                  )}
+                <TouchableOpacity
+                  style={styles.staffDeleteBtn}
+                  onPress={() => selectedStaff && handleDeleteStaff(selectedStaff._id, selectedStaff.name)}
+                >
+                  <Ionicons name="trash-outline" size={18} color="#dc2626" />
+                  <Text style={styles.staffDeleteBtnText}>Delete staff</Text>
+                </TouchableOpacity>
+                </>
               )}
-              <TouchableOpacity
-                style={styles.detailDeleteBtn}
-                onPress={() => selectedStaff && handleDeleteStaff(selectedStaff._id, selectedStaff.name)}
-              >
-                <Text style={styles.detailDeleteText}>Delete staff</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.detailCloseBtn} onPress={() => setDetailModalVisible(false)}>
-                <Text style={styles.detailCloseText}>Close</Text>
-              </TouchableOpacity>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
       </Modal>
     </SafeAreaView>
   );
@@ -581,6 +628,7 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '600',
     color: '#1a1a1a',
+    fontFamily: FONT_MEDIUM,
   },
   headerBrand: {
     flex: 1,
@@ -597,6 +645,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '600',
+    fontFamily: FONT_MEDIUM,
   },
   list: {
     padding: 16,
@@ -623,16 +672,19 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
     marginBottom: 4,
+    fontFamily: FONT_MEDIUM,
   },
   staffPhone: {
     fontSize: 14,
     color: '#64748b',
     marginBottom: 2,
+    fontFamily: FONT_REGULAR,
   },
   staffDetail: {
     fontSize: 13,
     color: '#64748b',
     marginTop: 4,
+    fontFamily: FONT_REGULAR,
   },
   cardRight: {
     alignItems: 'flex-end',
@@ -678,6 +730,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 20,
+    fontFamily: FONT_MEDIUM,
   },
   input: {
     borderWidth: 1,
@@ -688,6 +741,7 @@ const styles = StyleSheet.create({
     color: '#111827', // dark text so it stays visible in light/dark mode
     backgroundColor: '#ffffff',
     marginBottom: 12,
+    fontFamily: FONT_REGULAR,
   },
   inputArea: {
     minHeight: 56,
@@ -705,6 +759,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#374151',
     marginBottom: 4,
+    fontFamily: FONT_MEDIUM,
   },
   chipRow: {
     flexDirection: 'row',
@@ -728,6 +783,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#475569',
     fontWeight: '500',
+    fontFamily: FONT_REGULAR,
   },
   chipTextActive: {
     color: '#0369a1',
@@ -750,6 +806,7 @@ const styles = StyleSheet.create({
     color: '#333',
     fontSize: 16,
     fontWeight: '600',
+    fontFamily: FONT_MEDIUM,
   },
   submitButton: {
     backgroundColor: '#007AFF',
@@ -758,6 +815,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+    fontFamily: FONT_MEDIUM,
   },
   detailOverlay: {
     flex: 1,
@@ -768,16 +826,22 @@ const styles = StyleSheet.create({
   },
   detailModal: {
     width: '100%',
-    maxWidth: 340,
+    maxWidth: 360,
     backgroundColor: '#fff',
-    borderRadius: 14,
+    borderRadius: 16,
     padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 8,
   },
   detailTitle: {
     fontSize: 17,
     fontWeight: '600',
     color: '#1a1a1a',
     marginBottom: 14,
+    fontFamily: FONT_MEDIUM,
   },
   detailBody: {
     marginBottom: 16,
@@ -786,10 +850,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#334155',
     marginBottom: 8,
+    fontFamily: FONT_REGULAR,
   },
   detailLabel: {
     fontWeight: '600',
     color: '#64748b',
+    fontFamily: FONT_MEDIUM,
   },
   detailBadge: {
     alignSelf: 'flex-start',
@@ -802,6 +868,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: '600',
+    fontFamily: FONT_MEDIUM,
   },
   detailDeleteBtn: {
     paddingVertical: 10,
@@ -812,6 +879,7 @@ const styles = StyleSheet.create({
     color: '#dc2626',
     fontSize: 15,
     fontWeight: '600',
+    fontFamily: FONT_MEDIUM,
   },
   detailCloseBtn: {
     paddingVertical: 10,
@@ -821,5 +889,187 @@ const styles = StyleSheet.create({
     color: '#0EA5E9',
     fontSize: 15,
     fontWeight: '600',
+    fontFamily: FONT_MEDIUM,
+  },
+  salaryCard: {
+    marginTop: 6,
+    marginBottom: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#cbd5e1',
+    borderRadius: 10,
+    backgroundColor: '#f8fafc',
+    padding: 10,
+  },
+  salaryTitle: {
+    fontSize: 12,
+    color: '#475569',
+    fontFamily: FONT_MEDIUM,
+    marginBottom: 6,
+    textTransform: 'uppercase',
+  },
+  salaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  salaryLabel: {
+    fontSize: 13,
+    color: '#334155',
+    fontFamily: FONT_REGULAR,
+  },
+  salaryValue: {
+    fontSize: 14,
+    color: '#0f172a',
+    fontFamily: FONT_MEDIUM,
+  },
+  statsBox: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#e2e8f0',
+  },
+  statsTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#475569',
+    fontFamily: FONT_MEDIUM,
+    marginBottom: 4,
+  },
+  statsLine: {
+    fontSize: 12,
+    color: '#334155',
+    fontFamily: FONT_REGULAR,
+    marginBottom: 3,
+    lineHeight: 18,
+  },
+  fullScreenModal: {
+    flex: 1,
+    backgroundColor: '#f0f4f8',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  modalBackBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 20,
+    backgroundColor: '#f1f5f9',
+  },
+  modalHeaderTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#0f172a',
+    fontFamily: FONT_MEDIUM,
+  },
+  staffDetailBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  staffDetailCard: {
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  staffDetailCardTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#94a3b8',
+    letterSpacing: 0.5,
+    marginBottom: 10,
+    fontFamily: FONT_MEDIUM,
+  },
+  staffDetailInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#f1f5f9',
+  },
+  staffDetailInfoLabel: {
+    fontSize: 13,
+    color: '#64748b',
+    fontWeight: '500',
+    fontFamily: FONT_REGULAR,
+  },
+  staffDetailInfoValue: {
+    fontSize: 13,
+    color: '#0f172a',
+    fontWeight: '600',
+    fontFamily: FONT_MEDIUM,
+  },
+  staffStatsGrid: {
+    flexDirection: 'row',
+    marginBottom: 8,
+    gap: 8,
+  },
+  staffStatBox: {
+    flex: 1,
+    backgroundColor: '#f0f9ff',
+    borderRadius: 10,
+    padding: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#bae6fd',
+  },
+  staffStatNumber: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#0EA5E9',
+    fontFamily: FONT_MEDIUM,
+  },
+  staffStatLabel: {
+    fontSize: 10,
+    color: '#64748b',
+    fontWeight: '600',
+    marginTop: 2,
+    fontFamily: FONT_REGULAR,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  staffDeleteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    marginTop: 12,
+    backgroundColor: '#fef2f2',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  staffDeleteBtnText: {
+    color: '#dc2626',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 8,
+    fontFamily: FONT_MEDIUM,
   },
 });

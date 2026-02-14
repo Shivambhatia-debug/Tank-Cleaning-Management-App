@@ -6,11 +6,15 @@ import {
   ScrollView,
   ActivityIndicator,
   RefreshControl,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import api from '../../utils/api';
 import AppHeader from '../../components/AppHeader';
 import { useAuth } from '../../contexts/AuthContext';
+
+const FONT_REGULAR = Platform.select({ ios: 'Avenir Next', android: 'sans-serif', default: 'System' });
+const FONT_MEDIUM = Platform.select({ ios: 'Avenir Next', android: 'sans-serif-medium', default: 'System' });
 
 export default function ReportsScreen() {
   const { user, logout } = useAuth();
@@ -242,7 +246,7 @@ export default function ReportsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#f0f4f8',
   },
   loadingContainer: {
     flex: 1,
@@ -253,14 +257,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   section: {
-    paddingHorizontal: 14,
-    paddingTop: 12,
+    paddingHorizontal: 16,
+    paddingTop: 16,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 8,
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0f172a',
+    marginBottom: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    fontFamily: FONT_MEDIUM,
   },
   row: {
     flexDirection: 'row',
@@ -268,8 +275,13 @@ const styles = StyleSheet.create({
   },
   card: {
     flex: 1,
-    borderRadius: 12,
-    padding: 14,
+    borderRadius: 14,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
   },
   cardGreen: {
     backgroundColor: '#047857',
@@ -278,14 +290,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#1d4ed8',
   },
   cardLabel: {
-    fontSize: 13,
-    color: '#E5E7EB',
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
     marginBottom: 4,
+    fontFamily: FONT_REGULAR,
   },
   cardValue: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
     color: '#fff',
+    fontFamily: FONT_MEDIUM,
   },
   listRow: {
     flexDirection: 'row',
@@ -293,29 +307,38 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     backgroundColor: '#fff',
     marginTop: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#e5e7eb',
+    borderColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
   },
   listLeft: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#111827',
+    color: '#0f172a',
+    fontFamily: FONT_MEDIUM,
   },
   listRight: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#475569',
+    fontFamily: FONT_REGULAR,
   },
   subLine: {
     fontSize: 12,
-    color: '#6b7280',
+    color: '#64748b',
+    fontFamily: FONT_REGULAR,
   },
   badge: {
     fontSize: 11,
-    color: '#4b5563',
+    color: '#475569',
+    fontFamily: FONT_MEDIUM,
   },
   emptyText: {
     fontSize: 13,

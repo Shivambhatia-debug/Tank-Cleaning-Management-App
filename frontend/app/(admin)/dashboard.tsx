@@ -8,12 +8,16 @@ import {
   RefreshControl,
   ActivityIndicator,
   Dimensions,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../utils/api';
 import AppHeader from '../../components/AppHeader';
+
+const FONT_REGULAR = Platform.select({ ios: 'Avenir Next', android: 'sans-serif', default: 'System' });
+const FONT_MEDIUM = Platform.select({ ios: 'Avenir Next', android: 'sans-serif-medium', default: 'System' });
 
 const { width } = Dimensions.get('window');
 const isSmallDevice = width < 375;
@@ -418,22 +422,27 @@ const styles = StyleSheet.create({
     fontSize: isSmallDevice ? 20 : 22,
     fontWeight: '700',
     color: '#fff',
+    fontFamily: FONT_MEDIUM,
   },
   statLabel: {
     fontSize: 11,
     color: '#fff',
     marginTop: 1,
     opacity: 0.9,
+    fontFamily: FONT_REGULAR,
   },
   section: {
     padding: 14,
     paddingTop: 0,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1a1a1a',
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0f172a',
     marginBottom: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    fontFamily: FONT_MEDIUM,
   },
   rowCards: {
     flexDirection: 'row',
@@ -457,11 +466,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#64748b',
     marginBottom: 4,
+    fontFamily: FONT_REGULAR,
   },
   kpiValue: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
     color: '#0f172a',
+    fontFamily: FONT_MEDIUM,
   },
   reminderCard: {
     backgroundColor: '#ffffff',
@@ -552,14 +563,33 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#334155',
     marginBottom: 1,
+    fontFamily: FONT_MEDIUM,
   },
   actionSubtitle: {
     fontSize: 12,
     color: '#64748b',
+    fontFamily: FONT_REGULAR,
   },
   actionArrow: {
     fontSize: 20,
     color: '#cbd5e1',
     fontWeight: '400',
+  },
+  linkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#fff',
+    padding: 12,
+    borderRadius: 10,
+    marginTop: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#e2e8f0',
+  },
+  linkText: {
+    fontSize: 13,
+    color: '#0EA5E9',
+    fontWeight: '600',
+    fontFamily: FONT_MEDIUM,
   },
 });

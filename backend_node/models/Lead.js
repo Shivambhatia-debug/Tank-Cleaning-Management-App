@@ -50,7 +50,7 @@ const leadSchema = new mongoose.Schema(
     },
     source: {
       type: String,
-      enum: ['Facebook', 'Instagram', 'WhatsApp', 'Direct Call', 'Other'],
+      trim: true,
       default: 'Direct Call',
     },
     whatsappNumber: {

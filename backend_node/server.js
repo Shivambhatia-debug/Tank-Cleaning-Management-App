@@ -31,22 +31,50 @@ const multer = require('multer');
 app.use(cors());
 app.use(express.json());
 
-// Uploads Config (Vercel: /tmp only; local: uploads/)
+// --- Vercel Blob for persistent image storage (serverless) ---
+let blobPut = null;
+if (process.env.BLOB_READ_WRITE_TOKEN) {
+    try {
+        const blob = require('@vercel/blob');
+        blobPut = blob.put;
+        console.log('✅ Vercel Blob configured for image uploads');
+    } catch (e) {
+        console.warn('⚠️ @vercel/blob not available, falling back to disk storage');
+    }
+}
+
+async function uploadToStorage(fileBuffer, filename, contentType) {
+    if (blobPut && process.env.BLOB_READ_WRITE_TOKEN) {
+        const { url } = await blobPut(filename, fileBuffer, {
+            access: 'public',
+            token: process.env.BLOB_READ_WRITE_TOKEN,
+            contentType: contentType || 'image/jpeg',
+        });
+        return url; // full https URL
+    }
+    // Local fallback: write to disk
+    const filePath = path.join(uploadDir, filename);
+    fs.writeFileSync(filePath, fileBuffer);
+    return filename; // just filename, frontend prepends base URL
+}
+
+// Uploads Config (local dev: uploads/)
 const uploadDir = process.env.VERCEL ? '/tmp' : 'uploads';
 if (!process.env.VERCEL && !fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir);
 }
 app.use('/uploads', express.static(uploadDir));
 
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, uploadDir);
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, 'photo-' + uniqueSuffix + path.extname(file.originalname));
-    }
-});
+// Multer stores to memory buffer so we can send to Blob or disk
+const storage = process.env.BLOB_READ_WRITE_TOKEN
+    ? multer.memoryStorage()
+    : multer.diskStorage({
+        destination: (req, file, cb) => cb(null, uploadDir),
+        filename: (req, file, cb) => {
+            const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+            cb(null, 'photo-' + uniqueSuffix + path.extname(file.originalname));
+        }
+    });
 const upload = multer({ storage: storage });
 
 // Database Connection (skip on Vercel if MONGO_URI missing to avoid crash)
@@ -446,6 +474,19 @@ app.put('/api/leads/:id', auth, async (req, res) => {
     }
 });
 
+// Delete lead (admin only)
+app.delete('/api/leads/:id', auth, async (req, res) => {
+    if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
+    try {
+        const lead = await Lead.findByIdAndDelete(req.params.id);
+        if (!lead) return res.status(404).json({ message: 'Lead not found or already deleted' });
+        res.json({ success: true, message: 'Lead deleted' });
+    } catch (err) {
+        if (err.name === 'CastError') return res.status(400).json({ message: 'Invalid lead id' });
+        res.status(500).json({ message: err.message || 'Failed to delete lead' });
+    }
+});
+
 // Add discussion log to a lead
 app.post('/api/leads/:id/logs', auth, async (req, res) => {
     if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
@@ -473,6 +514,17 @@ app.post('/api/leads/:id/logs', auth, async (req, res) => {
         res.status(201).json(lead);
     } catch (err) {
         res.status(500).json({ message: err.message || 'Failed to add log' });
+    }
+});
+
+// --- GET current user profile (for staff profile screen) ---
+app.get('/api/users/me', auth, async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id).select('-password');
+        if (!user) return res.status(404).json({ message: 'User not found' });
+        res.json(user);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
     }
 });
 
@@ -816,19 +868,28 @@ app.delete('/api/jobs/:id', auth, async (req, res) => {
     }
 });
 
-// --- JOB PHOTO UPLOAD (Staff completion photo + time, date, location) ---
+// --- JOB PHOTO UPLOAD (after / completion photo) ---
 app.post('/api/jobs/:id/upload', auth, upload.single('photo'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
         const timestamp = req.body.timestamp ? new Date(req.body.timestamp) : new Date();
         const lat = req.body.latitude != null ? parseFloat(req.body.latitude) : null;
         const lng = req.body.longitude != null ? parseFloat(req.body.longitude) : null;
+
+        let photoUrl;
+        if (req.file.buffer) {
+            const fname = 'after-' + Date.now() + '-' + Math.round(Math.random() * 1E9) + path.extname(req.file.originalname || '.jpg');
+            photoUrl = await uploadToStorage(req.file.buffer, fname, req.file.mimetype);
+        } else {
+            photoUrl = req.file.filename;
+        }
+
         const updates = {
-            completionPhoto: req.file.filename,
+            completionPhoto: photoUrl,
             completionPhotoAt: timestamp,
             completionLatitude: lat,
             completionLongitude: lng,
-            $push: { 'photos.after': '/uploads/' + req.file.filename }
+            $push: { 'photos.after': photoUrl }
         };
         const job = await Job.findByIdAndUpdate(req.params.id, updates, { new: true });
         if (!job) return res.status(404).json({ message: 'Job not found' });
@@ -839,6 +900,43 @@ app.post('/api/jobs/:id/upload', auth, upload.single('photo'), async (req, res) 
             completionPhotoAt: job.completionPhotoAt,
             completionLatitude: job.completionLatitude,
             completionLongitude: job.completionLongitude
+        });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// --- JOB BEFORE PHOTO UPLOAD (before starting work) ---
+app.post('/api/jobs/:id/upload-before', auth, upload.single('photo'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
+        const timestamp = req.body.timestamp ? new Date(req.body.timestamp) : new Date();
+        const lat = req.body.latitude != null ? parseFloat(req.body.latitude) : null;
+        const lng = req.body.longitude != null ? parseFloat(req.body.longitude) : null;
+
+        let photoUrl;
+        if (req.file.buffer) {
+            const fname = 'before-' + Date.now() + '-' + Math.round(Math.random() * 1E9) + path.extname(req.file.originalname || '.jpg');
+            photoUrl = await uploadToStorage(req.file.buffer, fname, req.file.mimetype);
+        } else {
+            photoUrl = req.file.filename;
+        }
+
+        const updates = {
+            $push: { 'photos.before': photoUrl },
+            status: 'in_progress',
+            'timeline.startedAt': timestamp,
+            beforePhotoAt: timestamp,
+            beforePhotoLatitude: lat,
+            beforePhotoLongitude: lng,
+        };
+        const job = await Job.findByIdAndUpdate(req.params.id, updates, { new: true });
+        if (!job) return res.status(404).json({ message: 'Job not found' });
+        res.json({
+            success: true,
+            message: 'Before photo uploaded, job started',
+            photos: job.photos,
+            status: job.status
         });
     } catch (err) {
         res.status(500).json({ message: err.message });

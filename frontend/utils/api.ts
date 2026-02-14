@@ -72,3 +72,16 @@ api.interceptors.response.use(
 export default api;
 export const getUploadsBaseUrl = (): string => getBaseUrl();
 export const getApiBaseUrl = (): string => `${getBaseUrl()}/api`;
+
+/**
+ * Resolve a photo path to a full URL.
+ * - If it's already an absolute URL (blob / S3), return as-is.
+ * - If it starts with /uploads/, prepend base URL.
+ * - Otherwise treat as a bare filename and prepend base + /uploads/.
+ */
+export function resolvePhotoUrl(photo: string | null | undefined): string | null {
+  if (!photo) return null;
+  if (photo.startsWith('http://') || photo.startsWith('https://')) return photo;
+  if (photo.startsWith('/uploads/')) return `${getBaseUrl()}${photo}`;
+  return `${getBaseUrl()}/uploads/${photo}`;
+}
