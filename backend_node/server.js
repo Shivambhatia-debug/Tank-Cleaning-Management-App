@@ -1026,12 +1026,16 @@ app.post('/api/jobs/:id/upload', auth, upload.single('photo'), async (req, res) 
             photoUrl = req.file.filename;
         }
 
+        const afterMeta = { at: timestamp, latitude: lat, longitude: lng };
         const updates = {
             completionPhoto: photoUrl,
             completionPhotoAt: timestamp,
             completionLatitude: lat,
             completionLongitude: lng,
-            $push: { 'photos.after': photoUrl }
+            $push: {
+                'photos.after': photoUrl,
+                photosAfterMeta: afterMeta
+            }
         };
         const job = await Job.findByIdAndUpdate(req.params.id, updates, { new: true });
         if (!job) return res.status(404).json({ message: 'Job not found' });
@@ -1072,8 +1076,12 @@ app.post('/api/jobs/:id/upload-before', auth, upload.single('photo'), async (req
             photoUrl = req.file.filename;
         }
 
+        const beforeMeta = { at: timestamp, latitude: lat, longitude: lng };
         const updates = {
-            $push: { 'photos.before': photoUrl },
+            $push: {
+                'photos.before': photoUrl,
+                photosBeforeMeta: beforeMeta
+            },
             status: 'in_progress',
             'timeline.arrivedAt': timestamp,
             beforePhotoAt: timestamp,

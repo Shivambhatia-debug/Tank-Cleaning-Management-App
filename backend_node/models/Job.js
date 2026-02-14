@@ -99,6 +99,17 @@ const jobSchema = new mongoose.Schema({
         before: [String],
         after: [String]
     },
+    // Per-photo metadata: date/time & location when staff took each photo
+    photosBeforeMeta: [{
+        at: { type: Date },
+        latitude: Number,
+        longitude: Number
+    }],
+    photosAfterMeta: [{
+        at: { type: Date },
+        latitude: Number,
+        longitude: Number
+    }],
 
     // Proximity / Target Tracking
     targetLatitude: Number,

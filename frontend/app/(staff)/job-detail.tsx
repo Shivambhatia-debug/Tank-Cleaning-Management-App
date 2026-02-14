@@ -26,6 +26,41 @@ const FONT_MEDIUM = Platform.select({ ios: 'Avenir Next', android: 'sans-serif-m
 
 const MAX_PHOTOS = 10;
 
+function formatPhotoMeta(meta: { at?: string | Date; latitude?: number; longitude?: number } | null) {
+  if (!meta) return { dateTime: '', location: '' };
+  const at = meta.at ? new Date(meta.at) : null;
+  const dateTime = at ? at.toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : '';
+  const lat = meta.latitude;
+  const lng = meta.longitude;
+  const location = lat != null && lng != null ? `${lat.toFixed(4)}, ${lng.toFixed(4)}` : '';
+  return { dateTime, location };
+}
+
+function PhotoWithMeta({ uri, meta, placeholder }: { uri: string | null; meta?: { at?: string | Date; latitude?: number; longitude?: number } | null; placeholder?: boolean }) {
+  const { dateTime, location } = formatPhotoMeta(meta || null);
+  const hasOverlay = !!(dateTime || location);
+  return (
+    <View style={styles.photoWithMetaWrap}>
+      {uri && !placeholder ? (
+        <View style={styles.photoThumb}>
+          <Image source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          <Text style={styles.photoOverlayBrand}>CLEANING HERO</Text>
+          {hasOverlay && (
+            <View style={styles.photoOverlayBottom}>
+              {dateTime ? <Text style={styles.photoOverlayText} numberOfLines={1}>{dateTime}</Text> : null}
+              {location ? <Text style={styles.photoOverlayText} numberOfLines={1}>📍 {location}</Text> : null}
+            </View>
+          )}
+        </View>
+      ) : (
+        <View style={[styles.photoThumb, styles.photoPlaceholder]}>
+          <Ionicons name="image-outline" size={20} color="#cbd5e1" />
+        </View>
+      )}
+    </View>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /*  Step Progress Indicator                                            */
 /* ------------------------------------------------------------------ */
@@ -539,13 +574,8 @@ export default function JobDetailScreen() {
               <View style={styles.photoGrid}>
                 {(job.photos.before || []).map((p: string, idx: number) => {
                   const uri = resolvePhotoUrl(p);
-                  return uri ? (
-                    <Image key={idx} source={{ uri }} style={styles.photoThumb} resizeMode="cover" />
-                  ) : (
-                    <View key={idx} style={[styles.photoThumb, styles.photoPlaceholder]}>
-                      <Ionicons name="image-outline" size={20} color="#cbd5e1" />
-                    </View>
-                  );
+                  const meta = (job as any).photosBeforeMeta?.[idx];
+                  return <PhotoWithMeta key={idx} uri={uri} meta={meta} />;
                 })}
               </View>
             )}
@@ -587,9 +617,8 @@ export default function JobDetailScreen() {
               <View style={styles.photoGrid}>
                 {(job.photos?.after || []).map((p: string, idx: number) => {
                   const uri = resolvePhotoUrl(p);
-                  return uri ? (
-                    <Image key={idx} source={{ uri }} style={styles.photoThumb} resizeMode="cover" />
-                  ) : null;
+                  const meta = (job as any).photosAfterMeta?.[idx];
+                  return uri ? <PhotoWithMeta key={idx} uri={uri} meta={meta} /> : null;
                 })}
               </View>
             )}
@@ -726,7 +755,8 @@ export default function JobDetailScreen() {
                 <View style={styles.photoGrid}>
                   {(job.photos.before || []).map((p: string, idx: number) => {
                     const uri = resolvePhotoUrl(p);
-                    return uri ? <Image key={idx} source={{ uri }} style={styles.photoThumb} resizeMode="cover" /> : null;
+                    const meta = (job as any).photosBeforeMeta?.[idx];
+                    return uri ? <PhotoWithMeta key={idx} uri={uri} meta={meta} /> : null;
                   })}
                 </View>
               )}
@@ -738,7 +768,8 @@ export default function JobDetailScreen() {
                 <View style={styles.photoGrid}>
                   {(job.photos?.after || []).map((p: string, idx: number) => {
                     const uri = resolvePhotoUrl(p);
-                    return uri ? <Image key={idx} source={{ uri }} style={styles.photoThumb} resizeMode="cover" /> : null;
+                    const meta = (job as any).photosAfterMeta?.[idx];
+                    return uri ? <PhotoWithMeta key={idx} uri={uri} meta={meta} /> : null;
                   })}
                 </View>
               )}
@@ -958,6 +989,47 @@ const styles = StyleSheet.create({
     height: 70,
     borderRadius: 10,
     backgroundColor: '#f1f5f9',
+    overflow: 'hidden',
+  },
+  photoWithMetaWrap: {
+    width: 90,
+    marginBottom: 4,
+  },
+  photoOverlayBrand: {
+    position: 'absolute',
+    top: 2,
+    left: 2,
+    right: 2,
+    fontSize: 7,
+    fontWeight: '700',
+    color: '#fff',
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 2,
+    fontFamily: FONT_MEDIUM,
+  },
+  photoOverlayBottom: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  photoOverlayText: {
+    fontSize: 8,
+    color: '#fff',
+    fontFamily: FONT_REGULAR,
+  },
+  photoMeta: {
+    marginTop: 4,
+    paddingHorizontal: 2,
+  },
+  photoMetaText: {
+    fontSize: 9,
+    color: '#64748b',
+    fontFamily: FONT_REGULAR,
   },
   photoPlaceholder: {
     justifyContent: 'center',
