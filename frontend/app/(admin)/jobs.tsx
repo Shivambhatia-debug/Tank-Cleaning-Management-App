@@ -197,11 +197,22 @@ export default function JobsManagementScreen() {
   };
 
   const toggleStaffSelection = (staffId: string) => {
+    if (busyStaffIds.includes(staffId)) return;
     const tankCount = Number(newJob.tank_count) || 1;
     const nextIds = newJob.assigned_staff_ids.includes(staffId) ? [] : [staffId];
     const incentive = recalcIncentiveFromStaff(nextIds, tankCount);
     setNewJob({ ...newJob, assigned_staff_ids: nextIds, incentive_per_job: incentive });
   };
+
+  const ACTIVE_JOB_STATUSES = ['pending', 'on_the_way', 'in_progress'];
+  const busyStaffIds: string[] = Array.from(
+    new Set(
+      (jobs || [])
+        .filter((j: any) => ACTIVE_JOB_STATUSES.includes(j.status))
+        .flatMap((j: any) => (j.assignedStaff || []).map((s: any) => (s && (s._id || s)) ? String(s._id || s) : ''))
+        .filter(Boolean)
+    )
+  );
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -305,7 +316,17 @@ export default function JobsManagementScreen() {
           </View>
           <View style={styles.infoCell}>
             <Text style={styles.infoCellLabel}>Incentive/Job</Text>
-            <Text style={styles.infoCellValue}>{(item.incentivePerJob ?? item.incentive_per_job) != null ? `₹${Number(item.incentivePerJob ?? item.incentive_per_job).toLocaleString('en-IN')}` : '—'}</Text>
+            <Text style={styles.infoCellValue}>{(() => {
+              const firstStaff = (item.assignedStaff && item.assignedStaff[0]) ? item.assignedStaff[0] : null;
+              const tankCount = Number(item.tankCount ?? item.tank_count ?? 1);
+              const perTank = Number(firstStaff?.perTankIncentive ?? firstStaff?.per_tank_incentive ?? 0);
+              const perJob = Number(firstStaff?.defaultPerJobIncentive ?? firstStaff?.default_per_job_incentive ?? 0);
+              const staffFuel = Number(firstStaff?.defaultFuelExpense ?? firstStaff?.default_fuel_expense ?? 0);
+              const totalWithFuel = tankCount * perTank + perJob + staffFuel;
+              if (firstStaff && (perTank > 0 || perJob > 0 || staffFuel > 0)) return `₹${totalWithFuel.toLocaleString('en-IN')}`;
+              const fallback = item.incentivePerJob ?? item.incentive_per_job;
+              return (fallback != null) ? `₹${Number(fallback).toLocaleString('en-IN')}` : '—';
+            })()}</Text>
           </View>
         </View>
         {item.scheduledAt && (
@@ -641,28 +662,33 @@ export default function JobsManagementScreen() {
               />
 
               <Text style={styles.label}>Assign Staff * (one staff per job)</Text>
-              {(staff.filter((s) => s.isActive !== false) || []).map((s) => (
-                <TouchableOpacity
-                  key={s._id}
-                  style={[
-                    styles.staffItem,
-                    newJob.assigned_staff_ids.includes(s._id) &&
-                    styles.staffItemSelected,
-                  ]}
-                  onPress={() => toggleStaffSelection(s._id)}
-                >
-                  <Text
+              <Text style={[styles.label, { fontSize: 12, color: '#64748b', marginBottom: 6 }]}>Staff with pending / in-progress job cannot be selected.</Text>
+              {(staff.filter((s) => s.isActive !== false) || []).map((s) => {
+                const isBusy = busyStaffIds.includes(s._id);
+                return (
+                  <TouchableOpacity
+                    key={s._id}
                     style={[
-                      styles.staffName,
-                      newJob.assigned_staff_ids.includes(s._id) &&
-                      styles.staffNameSelected,
+                      styles.staffItem,
+                      newJob.assigned_staff_ids.includes(s._id) && styles.staffItemSelected,
+                      isBusy && { opacity: 0.5, backgroundColor: '#f1f5f9' },
                     ]}
+                    onPress={() => !isBusy && toggleStaffSelection(s._id)}
+                    disabled={isBusy}
                   >
-                    {s.name}
-                  </Text>
-                  <Text style={styles.staffPhone}>{s.phone}</Text>
-                </TouchableOpacity>
-              ))}
+                    <Text
+                      style={[
+                        styles.staffName,
+                        newJob.assigned_staff_ids.includes(s._id) && styles.staffNameSelected,
+                      ]}
+                    >
+                      {s.name}
+                      {isBusy ? ' (Busy – on another job)' : ''}
+                    </Text>
+                    <Text style={styles.staffPhone}>{s.phone}</Text>
+                  </TouchableOpacity>
+                );
+              })}
 
               <View style={styles.modalButtons}>
                 <TouchableOpacity

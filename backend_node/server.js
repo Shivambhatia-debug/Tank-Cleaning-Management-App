@@ -799,7 +799,7 @@ app.get('/api/jobs', auth, async (req, res) => {
             filter.assignedStaff = req.user.id;
         }
 
-        const jobs = await Job.find(filter).populate('assignedStaff', 'name phone lastLatitude lastLongitude lastLocationTime').sort({ 'timeline.createdAt': -1 });
+        const jobs = await Job.find(filter).populate('assignedStaff', 'name phone lastLatitude lastLongitude lastLocationTime perTankIncentive defaultPerJobIncentive defaultFuelExpense').sort({ 'timeline.createdAt': -1 });
         // Ensure each job has string "id" for client (delete etc.)
         const list = jobs.map(j => {
             const o = j.toObject ? j.toObject() : j;

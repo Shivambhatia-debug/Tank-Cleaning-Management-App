@@ -109,7 +109,6 @@ export default function StaffProfileScreen() {
             <CompensationItem label="Fixed Salary" value={formatCurrency(p.fixedSalary)} color="#0EA5E9" icon="wallet-outline" />
             <CompensationItem label="Per Tank Incentive" value={formatCurrency(p.perTankIncentive)} color="#8b5cf6" icon="water-outline" />
             <CompensationItem label="Per Job Incentive" value={formatCurrency(p.defaultPerJobIncentive)} color="#f59e0b" icon="trophy-outline" />
-            <CompensationItem label="Fuel Allowance" value={formatCurrency(p.fuelAllowance)} color="#22c55e" icon="car-outline" />
           </View>
         </View>
 

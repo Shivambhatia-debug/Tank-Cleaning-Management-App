@@ -53,9 +53,7 @@ export default function StaffManagementScreen() {
     perTankIncentive: '',
     defaultPerJobIncentive: '',
     defaultFuelExpense: '',
-    defaultChemicalExpense: '',
     hasBike: false,
-    fuelAllowance: '',
     joiningDate: '',
     employmentStatus: 'Active' as (typeof STAFF_STATUS_OPTIONS)[number],
     remarks: '',
@@ -122,9 +120,7 @@ export default function StaffManagementScreen() {
         perTankIncentive: newStaff.perTankIncentive ? Number(newStaff.perTankIncentive) || 0 : undefined,
         defaultPerJobIncentive: newStaff.defaultPerJobIncentive ? Number(newStaff.defaultPerJobIncentive) || 0 : undefined,
         defaultFuelExpense: newStaff.defaultFuelExpense ? Number(newStaff.defaultFuelExpense) || 0 : undefined,
-        defaultChemicalExpense: newStaff.defaultChemicalExpense ? Number(newStaff.defaultChemicalExpense) || 0 : undefined,
         hasBike: newStaff.hasBike,
-        fuelAllowance: newStaff.fuelAllowance ? Number(newStaff.fuelAllowance) || 0 : undefined,
         joiningDate: newStaff.joiningDate || undefined,
         employmentStatus: newStaff.employmentStatus,
         remarks: newStaff.remarks.trim() || undefined,
@@ -146,9 +142,7 @@ export default function StaffManagementScreen() {
         perTankIncentive: '',
         defaultPerJobIncentive: '',
         defaultFuelExpense: '',
-        defaultChemicalExpense: '',
         hasBike: false,
-        fuelAllowance: '',
         joiningDate: '',
         employmentStatus: 'Active',
         remarks: '',
@@ -395,19 +389,6 @@ export default function StaffManagementScreen() {
                 </View>
                 <View style={{ width: 10 }} />
                 <View style={styles.col}>
-                  <Text style={styles.label}>Default chemical expense (₹)</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="e.g. 30"
-                    placeholderTextColor="#9CA3AF"
-                    keyboardType="numeric"
-                    value={newStaff.defaultChemicalExpense}
-                    onChangeText={(t) => setNewStaff({ ...newStaff, defaultChemicalExpense: t })}
-                  />
-                </View>
-              </View>
-              <View style={styles.row}>
-                <View style={styles.col}>
                   <Text style={styles.label}>Bike</Text>
                   <View style={styles.chipRow}>
                     {['Yes', 'No'].map((opt) => {
@@ -426,18 +407,6 @@ export default function StaffManagementScreen() {
                       );
                     })}
                   </View>
-                </View>
-                <View style={{ width: 10 }} />
-                <View style={styles.col}>
-                  <Text style={styles.label}>Fuel allowance (₹)</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="e.g. 200"
-                    placeholderTextColor="#9CA3AF"
-                    keyboardType="numeric"
-                    value={newStaff.fuelAllowance}
-                    onChangeText={(t) => setNewStaff({ ...newStaff, fuelAllowance: t })}
-                  />
                 </View>
               </View>
 
@@ -554,8 +523,6 @@ export default function StaffManagementScreen() {
                   <View style={styles.staffDetailInfoRow}><Text style={styles.staffDetailInfoLabel}>Per Tank Incentive</Text><Text style={styles.staffDetailInfoValue}>{formatCurrencyOrDash(selectedStaff.perTankIncentive)}</Text></View>
                   <View style={styles.staffDetailInfoRow}><Text style={styles.staffDetailInfoLabel}>Default Per Job Incentive</Text><Text style={styles.staffDetailInfoValue}>{formatCurrencyOrDash(selectedStaff.defaultPerJobIncentive)}</Text></View>
                   <View style={styles.staffDetailInfoRow}><Text style={styles.staffDetailInfoLabel}>Default Fuel Expense (per job)</Text><Text style={styles.staffDetailInfoValue}>{formatCurrencyOrDash(selectedStaff.defaultFuelExpense)}</Text></View>
-                  <View style={styles.staffDetailInfoRow}><Text style={styles.staffDetailInfoLabel}>Default Chemical Expense</Text><Text style={styles.staffDetailInfoValue}>{formatCurrencyOrDash(selectedStaff.defaultChemicalExpense)}</Text></View>
-                  <View style={styles.staffDetailInfoRow}><Text style={styles.staffDetailInfoLabel}>Fuel Allowance</Text><Text style={styles.staffDetailInfoValue}>{formatCurrencyOrDash(selectedStaff.fuelAllowance)}</Text></View>
                 </View>
                 {editingStaff ? (
                   <View style={styles.staffDetailCard}>
@@ -566,10 +533,6 @@ export default function StaffManagementScreen() {
                     <TextInput style={styles.input} placeholder="e.g. 50" placeholderTextColor="#9CA3AF" keyboardType="numeric" value={String(editForm.defaultPerJobIncentive ?? selectedStaff.defaultPerJobIncentive ?? '')} onChangeText={(t) => setEditForm({ ...editForm, defaultPerJobIncentive: t })} />
                     <Text style={[styles.label, { marginTop: 8 }]}>Default Fuel Expense (₹)</Text>
                     <TextInput style={styles.input} placeholder="e.g. 50" placeholderTextColor="#9CA3AF" keyboardType="numeric" value={String(editForm.defaultFuelExpense ?? selectedStaff.defaultFuelExpense ?? '')} onChangeText={(t) => setEditForm({ ...editForm, defaultFuelExpense: t })} />
-                    <Text style={[styles.label, { marginTop: 8 }]}>Default Chemical Expense (₹)</Text>
-                    <TextInput style={styles.input} placeholder="e.g. 30" placeholderTextColor="#9CA3AF" keyboardType="numeric" value={String(editForm.defaultChemicalExpense ?? selectedStaff.defaultChemicalExpense ?? '')} onChangeText={(t) => setEditForm({ ...editForm, defaultChemicalExpense: t })} />
-                    <Text style={[styles.label, { marginTop: 8 }]}>Fuel Allowance (₹)</Text>
-                    <TextInput style={styles.input} placeholder="e.g. 200" placeholderTextColor="#9CA3AF" keyboardType="numeric" value={String(editForm.fuelAllowance ?? selectedStaff.fuelAllowance ?? '')} onChangeText={(t) => setEditForm({ ...editForm, fuelAllowance: t })} />
                     <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
                       <TouchableOpacity style={[styles.modalBtn, { flex: 1, backgroundColor: '#0EA5E9' }]} onPress={async () => {
                         try {
@@ -577,8 +540,6 @@ export default function StaffManagementScreen() {
                             perTankIncentive: Number(editForm.perTankIncentive ?? selectedStaff.perTankIncentive) || 0,
                             defaultPerJobIncentive: Number(editForm.defaultPerJobIncentive ?? selectedStaff.defaultPerJobIncentive) || 0,
                             defaultFuelExpense: editForm.defaultFuelExpense !== undefined ? Number(editForm.defaultFuelExpense) || 0 : undefined,
-                            defaultChemicalExpense: editForm.defaultChemicalExpense !== undefined ? Number(editForm.defaultChemicalExpense) || 0 : undefined,
-                            fuelAllowance: editForm.fuelAllowance !== undefined ? Number(editForm.fuelAllowance) || 0 : undefined,
                           });
                           setEditingStaff(false);
                           setSelectedStaff({
@@ -586,8 +547,6 @@ export default function StaffManagementScreen() {
                             perTankIncentive: Number(editForm.perTankIncentive ?? selectedStaff.perTankIncentive) || 0,
                             defaultPerJobIncentive: Number(editForm.defaultPerJobIncentive ?? selectedStaff.defaultPerJobIncentive) || 0,
                             defaultFuelExpense: editForm.defaultFuelExpense !== undefined ? Number(editForm.defaultFuelExpense) : selectedStaff.defaultFuelExpense,
-                            defaultChemicalExpense: editForm.defaultChemicalExpense !== undefined ? Number(editForm.defaultChemicalExpense) : selectedStaff.defaultChemicalExpense,
-                            fuelAllowance: editForm.fuelAllowance !== undefined ? Number(editForm.fuelAllowance) : selectedStaff.fuelAllowance,
                           });
                           loadStaff();
                         } catch (e: any) {
