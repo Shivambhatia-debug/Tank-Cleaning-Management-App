@@ -185,10 +185,14 @@ export default function JobsManagementScreen() {
         assigned_staff_ids: newJob.assigned_staff_ids.filter((id) => id !== staffId),
       });
     } else {
-      setNewJob({
-        ...newJob,
-        assigned_staff_ids: [...newJob.assigned_staff_ids, staffId],
-      });
+      const nextIds = [...newJob.assigned_staff_ids, staffId];
+      const updates: any = { ...newJob, assigned_staff_ids: nextIds };
+      if (nextIds.length === 1) {
+        const s = staff.find((st: any) => st._id === staffId);
+        const def = s?.defaultPerJobIncentive ?? s?.default_per_job_incentive;
+        if (def != null && def !== '') updates.incentive_per_job = String(def);
+      }
+      setNewJob(updates);
     }
   };
 

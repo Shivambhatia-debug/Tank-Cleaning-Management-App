@@ -242,18 +242,21 @@ app.post('/api/users/staff', auth, async (req, res) => {
         if (defaultPerJobIncentive != null) staffData.defaultPerJobIncentive = Number(defaultPerJobIncentive) || 0;
         if (typeof hasBike === 'boolean') staffData.hasBike = hasBike;
         if (fuelAllowance != null) staffData.fuelAllowance = Number(fuelAllowance) || 0;
-        if (joiningDate) staffData.joiningDate = new Date(joiningDate);
         if (employmentStatus && ['Active', 'Inactive', 'Terminated'].includes(employmentStatus)) {
             staffData.employmentStatus = employmentStatus;
             staffData.isActive = employmentStatus === 'Active';
         }
         if (remarks) staffData.remarks = String(remarks).trim();
+        if (joiningDate) {
+            const d = new Date(joiningDate);
+            if (!isNaN(d.getTime())) staffData.joiningDate = d;
+        }
 
         const staff = new User(staffData);
         await staff.save();
         res.status(201).json({ message: 'Staff created successfully' });
     } catch (err) {
-        res.status(500).json({ message: err.message });
+        res.status(500).json({ message: err.message || 'Failed to create staff' });
     }
 });
 

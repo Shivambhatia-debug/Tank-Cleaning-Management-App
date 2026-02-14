@@ -136,7 +136,8 @@ export default function StaffManagementScreen() {
       });
       loadStaff();
     } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.detail || 'Failed to add staff');
+      const msg = error.response?.data?.message || error.response?.data?.detail || error.message || 'Failed to add staff';
+      Alert.alert('Error', msg);
     } finally {
       setAddingStaff(false);
     }
