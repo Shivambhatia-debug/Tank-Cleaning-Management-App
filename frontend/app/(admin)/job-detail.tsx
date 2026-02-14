@@ -173,6 +173,8 @@ export default function AdminJobDetailScreen() {
   const afterCount = job.photos?.after?.length || 0;
   const charge = Number(job.serviceCharge ?? job.service_charge ?? 0);
   const incentive = Number(job.incentivePerJob ?? job.incentive_per_job ?? 0);
+  const totalExpense = Number(job.jobExpenses?.totalExpense ?? 0);
+  const profit = charge - totalExpense - incentive;
   const paymentStatus = job.paymentStatus === 'paid' ? 'Paid' : 'Pending';
   const paymentMode = (job.paymentMode || job.payment_mode || '—').toUpperCase();
 
@@ -305,6 +307,32 @@ export default function AdminJobDetailScreen() {
             icon="🎁"
           />
         </View>
+
+        {/* -------- Job Expenses & Profit -------- */}
+        {(job.status === 'completed' || totalExpense > 0) && (
+          <>
+            <SectionTitle title="Expenses & Profit" />
+            <View style={styles.card}>
+              {job.jobExpenses?.fuelCost > 0 && (
+                <InfoRow label="Fuel Cost" value={`₹${job.jobExpenses.fuelCost.toLocaleString('en-IN')}`} icon="⛽" />
+              )}
+              {job.jobExpenses?.chemicalCost > 0 && (
+                <InfoRow label="Chemical Cost" value={`₹${job.jobExpenses.chemicalCost.toLocaleString('en-IN')}`} icon="🧪" />
+              )}
+              {job.jobExpenses?.otherCost > 0 && (
+                <InfoRow label={job.jobExpenses.otherCostNote || 'Other'} value={`₹${job.jobExpenses.otherCost.toLocaleString('en-IN')}`} icon="📦" />
+              )}
+              <InfoRow label="Total Expense" value={totalExpense > 0 ? `₹${totalExpense.toLocaleString('en-IN')}` : '₹0'} icon="🧾" />
+              <View style={{ marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#e2e8f0' }}>
+                <InfoRow
+                  label="Net Profit"
+                  value={`₹${profit.toLocaleString('en-IN')}`}
+                  icon={profit >= 0 ? '📈' : '📉'}
+                />
+              </View>
+            </View>
+          </>
+        )}
 
         {/* -------- Before Photos -------- */}
         <SectionTitle title={`Before Photos (${beforeCount})`} />

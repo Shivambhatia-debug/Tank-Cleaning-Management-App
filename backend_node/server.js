@@ -863,6 +863,77 @@ app.put('/api/jobs/:id', auth, async (req, res) => {
     }
 });
 
+// --- SAVE JOB EXPENSES (Staff submits after completion) ---
+app.post('/api/jobs/:id/expenses', auth, async (req, res) => {
+    try {
+        const { fuelCost, chemicalCost, otherCost, otherCostNote } = req.body;
+        const fuel = Number(fuelCost) || 0;
+        const chemical = Number(chemicalCost) || 0;
+        const other = Number(otherCost) || 0;
+        const totalExpense = fuel + chemical + other;
+
+        const job = await Job.findByIdAndUpdate(req.params.id, {
+            'jobExpenses.fuelCost': fuel,
+            'jobExpenses.chemicalCost': chemical,
+            'jobExpenses.otherCost': other,
+            'jobExpenses.otherCostNote': (otherCostNote || '').trim(),
+            'jobExpenses.totalExpense': totalExpense,
+        }, { new: true });
+
+        if (!job) return res.status(404).json({ message: 'Job not found' });
+
+        // Auto-create expense entries in Expense collection for admin tracking
+        const staffName = req.user.name || req.user.phone || 'Staff';
+        const staffId = req.user._id || req.user.id;
+        const expenseDate = job.timeline?.completedAt || new Date();
+
+        const expensesToCreate = [];
+        if (fuel > 0) {
+            expensesToCreate.push({
+                date: expenseDate,
+                amount: fuel,
+                category: 'Fuel',
+                purpose: `Fuel for job: ${job.customerName} (${job.address})`,
+                staffName,
+                staffId,
+                paymentMode: 'Cash',
+                notes: `Auto from job ${job._id}`,
+            });
+        }
+        if (chemical > 0) {
+            expensesToCreate.push({
+                date: expenseDate,
+                amount: chemical,
+                category: 'Chemical',
+                purpose: `Chemical for job: ${job.customerName} (${job.address})`,
+                staffName,
+                staffId,
+                paymentMode: 'Cash',
+                notes: `Auto from job ${job._id}`,
+            });
+        }
+        if (other > 0) {
+            expensesToCreate.push({
+                date: expenseDate,
+                amount: other,
+                category: 'Miscellaneous',
+                purpose: `${otherCostNote || 'Other expense'} for job: ${job.customerName}`,
+                staffName,
+                staffId,
+                paymentMode: 'Cash',
+                notes: `Auto from job ${job._id}`,
+            });
+        }
+        if (expensesToCreate.length > 0) {
+            await Expense.insertMany(expensesToCreate);
+        }
+
+        res.json({ success: true, totalExpense, message: 'Expenses saved' });
+    } catch (err) {
+        res.status(500).json({ message: err.message || 'Failed to save expenses' });
+    }
+});
+
 // --- DELETE JOB (Admin only) ---
 app.delete('/api/jobs/:id', auth, async (req, res) => {
     if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
@@ -1076,6 +1147,9 @@ app.get('/api/health', async (req, res) => {
 
 app.get('/api/stats/dashboard', auth, requireDb, async (req, res) => {
     try {
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
         const totalJobs = await Job.countDocuments();
         const pendingJobs = await Job.countDocuments({ status: 'pending' });
         const onTheWayJobs = await Job.countDocuments({ status: 'on_the_way' });
@@ -1083,13 +1157,34 @@ app.get('/api/stats/dashboard', auth, requireDb, async (req, res) => {
         const completedJobs = await Job.countDocuments({ status: 'completed' });
         const activeStaff = await User.countDocuments({ role: 'staff', isActive: true });
 
+        // Revenue & Expense totals
+        const paidJobs = await Job.find({ paymentStatus: 'paid' }).select('serviceCharge jobExpenses');
+        const totalRevenue = paidJobs.reduce((s, j) => s + (j.serviceCharge || 0), 0);
+        const totalJobExpenses = paidJobs.reduce((s, j) => s + (j.jobExpenses?.totalExpense || 0), 0);
+
+        const monthlyPaidJobs = await Job.find({
+            paymentStatus: 'paid',
+            'timeline.completedAt': { $gte: startOfMonth }
+        }).select('serviceCharge jobExpenses');
+        const monthlyRevenue = monthlyPaidJobs.reduce((s, j) => s + (j.serviceCharge || 0), 0);
+        const monthlyExpense = monthlyPaidJobs.reduce((s, j) => s + (j.jobExpenses?.totalExpense || 0), 0);
+
+        // Also count general expenses from Expense collection
+        const allExpenses = await Expense.aggregate([{ $group: { _id: null, total: { $sum: '$amount' } } }]);
+        const totalExpenseGeneral = allExpenses.length > 0 ? allExpenses[0].total : 0;
+
         res.json({
             totalJobs,
             pendingJobs,
             onTheWayJobs,
             inProgressJobs,
             completedJobs,
-            activeStaff
+            activeStaff,
+            totalRevenue,
+            totalExpenses: totalExpenseGeneral,
+            monthlyRevenue,
+            monthlyExpense,
+            totalProfit: totalRevenue - totalExpenseGeneral,
         });
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -1115,18 +1210,15 @@ app.get('/api/stats/staff/:id', auth, async (req, res) => {
         const completedJobs = allJobs.filter(j => j.status === 'completed').length;
         const totalRevenue = allJobs.reduce((sum, j) => sum + (j.serviceCharge || 0), 0);
 
-        // Incentive: per completed job uses incentivePerJob (fallback 20)
-        const DEFAULT_INCENTIVE = 20;
+        // Incentive: per completed job uses incentivePerJob (no default fallback)
         const completedForIncentive = allJobs.filter(j => j.status === 'completed');
         const totalIncentive = completedForIncentive.reduce((sum, j) => {
-            const per = j.incentivePerJob != null && !isNaN(j.incentivePerJob) ? j.incentivePerJob : DEFAULT_INCENTIVE;
-            return sum + per;
+            return sum + (Number(j.incentivePerJob) || 0);
         }, 0);
         const monthlyIncentive = monthlyJobs
             .filter(j => j.status === 'completed')
             .reduce((sum, j) => {
-                const per = j.incentivePerJob != null && !isNaN(j.incentivePerJob) ? j.incentivePerJob : DEFAULT_INCENTIVE;
-                return sum + per;
+                return sum + (Number(j.incentivePerJob) || 0);
             }, 0);
 
         const monthlyRevenue = monthlyJobs.reduce((sum, j) => sum + (j.serviceCharge || 0), 0);

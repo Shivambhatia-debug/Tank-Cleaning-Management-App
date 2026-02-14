@@ -151,6 +151,36 @@ export default function DashboardScreen() {
                 <Text style={styles.statLabel}>Active Staff</Text>
               </View>
             </View>
+
+            <View style={[styles.statCard, { borderLeftColor: '#16a34a', borderLeftWidth: 4 }]}>
+              <View style={styles.statIcon}>
+                <Text style={styles.iconText}>💰</Text>
+              </View>
+              <View style={styles.statContent}>
+                <Text style={styles.statValue}>₹{(stats?.totalRevenue || 0).toLocaleString('en-IN')}</Text>
+                <Text style={styles.statLabel}>Total Revenue</Text>
+              </View>
+            </View>
+
+            <View style={[styles.statCard, { borderLeftColor: '#dc2626', borderLeftWidth: 4 }]}>
+              <View style={styles.statIcon}>
+                <Text style={styles.iconText}>🧾</Text>
+              </View>
+              <View style={styles.statContent}>
+                <Text style={styles.statValue}>₹{(stats?.totalExpenses || 0).toLocaleString('en-IN')}</Text>
+                <Text style={styles.statLabel}>Total Expenses</Text>
+              </View>
+            </View>
+
+            <View style={[styles.statCard, { borderLeftColor: '#0EA5E9', borderLeftWidth: 4 }]}>
+              <View style={styles.statIcon}>
+                <Text style={styles.iconText}>📈</Text>
+              </View>
+              <View style={styles.statContent}>
+                <Text style={styles.statValue}>₹{(stats?.totalProfit || 0).toLocaleString('en-IN')}</Text>
+                <Text style={styles.statLabel}>Net Profit</Text>
+              </View>
+            </View>
           </View>
         </View>
 

@@ -123,6 +123,15 @@ const jobSchema = new mongoose.Schema({
         default: 0
     },
 
+    // --- Staff Expenses (filled on job completion) ---
+    jobExpenses: {
+        fuelCost: { type: Number, default: 0 },
+        chemicalCost: { type: Number, default: 0 },
+        otherCost: { type: Number, default: 0 },
+        otherCostNote: { type: String, trim: true },
+        totalExpense: { type: Number, default: 0 },
+    },
+
     // Auto-filled when job completes (repeat cleaning reminder)
     nextServiceAt: {
         type: Date // completedAt + 6 months

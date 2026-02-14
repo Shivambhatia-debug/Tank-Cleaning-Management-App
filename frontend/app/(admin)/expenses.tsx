@@ -25,6 +25,7 @@ export default function ExpensesScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filterCategory, setFilterCategory] = useState<'All' | (typeof CATEGORY_OPTIONS)[number]>('All');
+  const [dashStats, setDashStats] = useState<any>(null);
 
   const [modalVisible, setModalVisible] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -40,7 +41,15 @@ export default function ExpensesScreen() {
 
   useEffect(() => {
     loadExpenses();
+    loadDashStats();
   }, []);
+
+  const loadDashStats = async () => {
+    try {
+      const res = await api.get('/stats/dashboard');
+      setDashStats(res.data);
+    } catch (e) { /* ignore */ }
+  };
 
   const loadExpenses = async () => {
     setLoading(true);
@@ -154,6 +163,35 @@ export default function ExpensesScreen() {
           <Text style={styles.addButtonText}>+ Add</Text>
         </TouchableOpacity>
       </View>
+
+      {dashStats && (
+        <View style={styles.profitSummary}>
+          <View style={styles.profitRow}>
+            <View style={[styles.profitBox, { borderLeftColor: '#16a34a' }]}>
+              <Text style={styles.profitLabel}>Revenue</Text>
+              <Text style={[styles.profitValue, { color: '#16a34a' }]}>₹{(dashStats.totalRevenue || 0).toLocaleString('en-IN')}</Text>
+            </View>
+            <View style={[styles.profitBox, { borderLeftColor: '#dc2626' }]}>
+              <Text style={styles.profitLabel}>Expenses</Text>
+              <Text style={[styles.profitValue, { color: '#dc2626' }]}>₹{(dashStats.totalExpenses || 0).toLocaleString('en-IN')}</Text>
+            </View>
+            <View style={[styles.profitBox, { borderLeftColor: '#0EA5E9' }]}>
+              <Text style={styles.profitLabel}>Profit</Text>
+              <Text style={[styles.profitValue, { color: (dashStats.totalProfit || 0) >= 0 ? '#0EA5E9' : '#dc2626' }]}>₹{(dashStats.totalProfit || 0).toLocaleString('en-IN')}</Text>
+            </View>
+          </View>
+          <View style={styles.profitRow}>
+            <View style={[styles.profitBox, { borderLeftColor: '#8b5cf6' }]}>
+              <Text style={styles.profitLabel}>Monthly Revenue</Text>
+              <Text style={[styles.profitValue, { color: '#8b5cf6' }]}>₹{(dashStats.monthlyRevenue || 0).toLocaleString('en-IN')}</Text>
+            </View>
+            <View style={[styles.profitBox, { borderLeftColor: '#f59e0b' }]}>
+              <Text style={styles.profitLabel}>Monthly Expense</Text>
+              <Text style={[styles.profitValue, { color: '#f59e0b' }]}>₹{(dashStats.monthlyExpense || 0).toLocaleString('en-IN')}</Text>
+            </View>
+          </View>
+        </View>
+      )}
 
       <View style={styles.filterBar}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -310,6 +348,39 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F5F5',
+  },
+  profitSummary: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  profitRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  profitBox: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 12,
+    borderLeftWidth: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  profitLabel: {
+    fontSize: 11,
+    color: '#94a3b8',
+    fontWeight: '600',
+    letterSpacing: 0.3,
+    marginBottom: 4,
+  },
+  profitValue: {
+    fontSize: 16,
+    fontWeight: '700',
   },
   loadingContainer: {
     flex: 1,
