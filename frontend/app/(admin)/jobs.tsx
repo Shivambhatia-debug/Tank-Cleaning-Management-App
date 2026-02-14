@@ -354,15 +354,17 @@ export default function JobsManagementScreen() {
             <Ionicons name="camera-reverse-outline" size={13} color="#22c55e" />
             <Text style={[styles.photoProgressText, { color: '#22c55e' }]}>After: {item.photos?.after?.length || 0}</Text>
           </View>
-          {item.timeline?.startedAt && (
-            <Text style={{ fontSize: 10, color: '#f59e0b' }}>On Way {new Date(item.timeline.startedAt).toLocaleDateString()}</Text>
-          )}
-          {item.timeline?.arrivedAt && (
-            <Text style={{ fontSize: 10, color: '#0EA5E9' }}>Arrived {new Date(item.timeline.arrivedAt).toLocaleDateString()}</Text>
-          )}
-          {item.timeline?.completedAt && (
-            <Text style={{ fontSize: 10, color: '#16a34a' }}>Done {new Date(item.timeline.completedAt).toLocaleDateString()}</Text>
-          )}
+          <View style={styles.photoProgressTimeline}>
+            {item.timeline?.startedAt && (
+              <Text style={{ fontSize: 10, color: '#f59e0b' }} numberOfLines={1}>On Way {new Date(item.timeline.startedAt).toLocaleDateString()}</Text>
+            )}
+            {item.timeline?.arrivedAt && (
+              <Text style={{ fontSize: 10, color: '#0EA5E9' }} numberOfLines={1}>Arrived {new Date(item.timeline.arrivedAt).toLocaleDateString()}</Text>
+            )}
+            {item.timeline?.completedAt && (
+              <Text style={{ fontSize: 10, color: '#16a34a' }} numberOfLines={1}>Done {new Date(item.timeline.completedAt).toLocaleDateString()}</Text>
+            )}
+          </View>
         </View>
       )}
 
@@ -1135,12 +1137,21 @@ const styles = StyleSheet.create({
   photoProgressBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    flexWrap: 'wrap',
+    gap: 8,
     paddingTop: 8,
     paddingBottom: 4,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#e2e8f0',
     marginTop: 4,
+  },
+  photoProgressTimeline: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+    minWidth: 0,
   },
   photoProgressItem: {
     flexDirection: 'row',

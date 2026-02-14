@@ -1217,21 +1217,64 @@ app.get('/api/stats/dashboard', auth, requireDb, async (req, res) => {
         const completedJobs = await Job.countDocuments({ status: 'completed' });
         const activeStaff = await User.countDocuments({ role: 'staff', isActive: true });
 
-        // Revenue & Expense totals
+        // Revenue from paid jobs
         const paidJobs = await Job.find({ paymentStatus: 'paid' }).select('serviceCharge jobExpenses');
         const totalRevenue = paidJobs.reduce((s, j) => s + (j.serviceCharge || 0), 0);
-        const totalJobExpenses = paidJobs.reduce((s, j) => s + (j.jobExpenses?.totalExpense || 0), 0);
 
         const monthlyPaidJobs = await Job.find({
             paymentStatus: 'paid',
             'timeline.completedAt': { $gte: startOfMonth }
         }).select('serviceCharge jobExpenses');
         const monthlyRevenue = monthlyPaidJobs.reduce((s, j) => s + (j.serviceCharge || 0), 0);
-        const monthlyExpense = monthlyPaidJobs.reduce((s, j) => s + (j.jobExpenses?.totalExpense || 0), 0);
 
-        // Also count general expenses from Expense collection
+        // Expense collection total (fuel, chemical, manual, etc.)
         const allExpenses = await Expense.aggregate([{ $group: { _id: null, total: { $sum: '$amount' } } }]);
         const totalExpenseGeneral = allExpenses.length > 0 ? allExpenses[0].total : 0;
+
+        // Staff incentive = expense (what we pay to staff). Include in total expenses so admin profit is correct.
+        const completedJobsForIncentive = await Job.find({ status: 'completed' })
+            .select('tankCount incentivePerJob')
+            .populate('assignedStaff', 'perTankIncentive defaultPerJobIncentive defaultFuelExpense');
+        const totalStaffIncentive = completedJobsForIncentive.reduce((s, j) => {
+            const firstStaff = (j.assignedStaff && j.assignedStaff[0]) ? j.assignedStaff[0] : null;
+            const tankCount = Number(j.tankCount ?? 1);
+            const perTank = Number(firstStaff?.perTankIncentive ?? 0);
+            const perJob = Number(firstStaff?.defaultPerJobIncentive ?? 0);
+            const fuel = Number(firstStaff?.defaultFuelExpense ?? 0);
+            const incentive = firstStaff && (perTank > 0 || perJob > 0 || fuel > 0)
+                ? tankCount * perTank + perJob + fuel
+                : (Number(j.incentivePerJob) || 0);
+            return s + incentive;
+        }, 0);
+
+        const completedJobsMonthly = await Job.find({
+            status: 'completed',
+            'timeline.completedAt': { $gte: startOfMonth }
+        })
+            .select('tankCount incentivePerJob')
+            .populate('assignedStaff', 'perTankIncentive defaultPerJobIncentive defaultFuelExpense');
+        const monthlyStaffIncentive = completedJobsMonthly.reduce((s, j) => {
+            const firstStaff = (j.assignedStaff && j.assignedStaff[0]) ? j.assignedStaff[0] : null;
+            const tankCount = Number(j.tankCount ?? 1);
+            const perTank = Number(firstStaff?.perTankIncentive ?? 0);
+            const perJob = Number(firstStaff?.defaultPerJobIncentive ?? 0);
+            const fuel = Number(firstStaff?.defaultFuelExpense ?? 0);
+            const incentive = firstStaff && (perTank > 0 || perJob > 0 || fuel > 0)
+                ? tankCount * perTank + perJob + fuel
+                : (Number(j.incentivePerJob) || 0);
+            return s + incentive;
+        }, 0);
+
+        // Monthly expense = Expense collection (date in month) + staff incentive (jobs completed this month)
+        const monthlyExpenseAgg = await Expense.aggregate([
+            { $match: { date: { $gte: startOfMonth, $lte: now } } },
+            { $group: { _id: null, total: { $sum: '$amount' } } }
+        ]);
+        const monthlyExpenseGeneral = monthlyExpenseAgg.length > 0 ? monthlyExpenseAgg[0].total : 0;
+        const monthlyExpense = monthlyExpenseGeneral + monthlyStaffIncentive;
+
+        const totalExpenses = totalExpenseGeneral + totalStaffIncentive;
+        const totalProfit = totalRevenue - totalExpenses;
 
         res.json({
             totalJobs,
@@ -1241,10 +1284,12 @@ app.get('/api/stats/dashboard', auth, requireDb, async (req, res) => {
             completedJobs,
             activeStaff,
             totalRevenue,
-            totalExpenses: totalExpenseGeneral,
+            totalExpenses,
+            totalStaffIncentive,
             monthlyRevenue,
             monthlyExpense,
-            totalProfit: totalRevenue - totalExpenseGeneral,
+            monthlyStaffIncentive,
+            totalProfit,
         });
     } catch (err) {
         res.status(500).json({ message: err.message });

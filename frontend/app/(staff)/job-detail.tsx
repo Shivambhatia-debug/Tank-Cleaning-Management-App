@@ -347,6 +347,18 @@ export default function JobDetailScreen() {
   const afterCount = job?.photos?.after?.length || 0;
   const isPaid = job?.paymentStatus === 'paid';
 
+  // Incentive breakdown from assigned staff
+  const staffList: any[] = Array.isArray(job?.assignedStaff) ? job.assignedStaff : [];
+  const firstStaff = staffList.length > 0 ? staffList[0] : null;
+  const tankCount = Number(job?.tankCount ?? job?.tank_count ?? 1);
+  const perTank = Number(firstStaff?.perTankIncentive ?? firstStaff?.per_tank_incentive ?? 0);
+  const perJob = Number(firstStaff?.defaultPerJobIncentive ?? firstStaff?.default_per_job_incentive ?? 0);
+  const staffFuel = Number(firstStaff?.defaultFuelExpense ?? firstStaff?.default_fuel_expense ?? 0);
+  const incentiveBase = tankCount * perTank + perJob;
+  const totalIncentiveWithFuel = incentiveBase + staffFuel;
+  const hasBreakdown = firstStaff && (perTank > 0 || perJob > 0 || staffFuel > 0);
+  const displayIncentive = hasBreakdown ? totalIncentiveWithFuel : Number(job?.incentivePerJob ?? job?.incentive_per_job ?? 0);
+
   // Calculate current step: 0=Start, 1=On the Way, 2=Before Photo, 3=After Photo, 4=Complete
   let currentStep = 0;
   if (job) {
@@ -434,7 +446,7 @@ export default function JobDetailScreen() {
             <View style={{ alignItems: 'flex-end' }}>
               <Text style={{ fontSize: 11, color: '#64748b', fontWeight: '600', letterSpacing: 0.5, fontFamily: FONT_MEDIUM }}>YOUR INCENTIVE</Text>
               <Text style={{ fontSize: 18, color: '#16a34a', fontWeight: '700', fontFamily: FONT_MEDIUM }}>
-                ₹{Number(job.incentivePerJob || 0).toLocaleString('en-IN')}
+                ₹{displayIncentive.toLocaleString('en-IN')}
               </Text>
             </View>
             <View style={[styles.paymentBadge, { backgroundColor: isPaid ? '#dcfce7' : '#fef3c7' }]}>
@@ -444,6 +456,33 @@ export default function JobDetailScreen() {
               </Text>
             </View>
           </View>
+          {hasBreakdown && (
+            <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#bbf7d0' }}>
+              <Text style={{ fontSize: 11, color: '#64748b', fontWeight: '700', letterSpacing: 0.5, marginBottom: 8, fontFamily: FONT_MEDIUM }}>INCENTIVE BREAKDOWN</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2 }}>
+                <Text style={{ fontSize: 12, color: '#475569', fontFamily: FONT_REGULAR }}>No. of Tanks</Text>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: '#0f172a', fontFamily: FONT_MEDIUM }}>{tankCount}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2 }}>
+                <Text style={{ fontSize: 12, color: '#475569', fontFamily: FONT_REGULAR }}>Per tank incentive</Text>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: '#0f172a', fontFamily: FONT_MEDIUM }}>₹{perTank.toLocaleString('en-IN')}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2 }}>
+                <Text style={{ fontSize: 12, color: '#475569', fontFamily: FONT_REGULAR }}>Per job incentive</Text>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: '#0f172a', fontFamily: FONT_MEDIUM }}>₹{perJob.toLocaleString('en-IN')}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2 }}>
+                <Text style={{ fontSize: 12, color: '#475569', fontFamily: FONT_REGULAR }}>Fuel (per job)</Text>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: '#0f172a', fontFamily: FONT_MEDIUM }}>₹{staffFuel.toLocaleString('en-IN')}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, marginTop: 4, borderTopWidth: 1, borderTopColor: '#e2e8f0' }}>
+                <Text style={{ fontSize: 11, color: '#64748b', fontFamily: FONT_REGULAR }}>Calculation</Text>
+                <Text style={{ fontSize: 11, color: '#64748b', fontFamily: FONT_REGULAR }} numberOfLines={1}>
+                  {tankCount}×₹{perTank} + ₹{perJob} + ₹{staffFuel} = ₹{totalIncentiveWithFuel.toLocaleString('en-IN')}
+                </Text>
+              </View>
+            </View>
+          )}
         </View>
 
         {/* Location Card */}
@@ -814,8 +853,13 @@ export default function JobDetailScreen() {
               <Text style={[styles.cardTitle, { color: '#16a34a' }]}>YOUR EARNINGS</Text>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}>
                 <Text style={{ fontSize: 13, color: '#64748b', fontFamily: FONT_REGULAR }}>Incentive</Text>
-                <Text style={{ fontSize: 14, fontWeight: '700', color: '#16a34a', fontFamily: FONT_MEDIUM }}>₹{Number(job.incentivePerJob || 0).toLocaleString('en-IN')}</Text>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: '#16a34a', fontFamily: FONT_MEDIUM }}>₹{displayIncentive.toLocaleString('en-IN')}</Text>
               </View>
+              {hasBreakdown && (
+                <View style={{ marginLeft: 8, marginTop: 4, paddingVertical: 6, paddingLeft: 8, borderLeftWidth: 2, borderLeftColor: '#86efac' }}>
+                  <Text style={{ fontSize: 11, color: '#64748b', fontFamily: FONT_MEDIUM }}>Breakdown: {tankCount} tanks × ₹{perTank} + ₹{perJob} + ₹{staffFuel} fuel</Text>
+                </View>
+              )}
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}>
                 <Text style={{ fontSize: 13, color: '#64748b', fontFamily: FONT_REGULAR }}>Service Charge</Text>
                 <Text style={{ fontSize: 14, fontWeight: '600', color: '#0f172a', fontFamily: FONT_MEDIUM }}>₹{Number(job.serviceCharge || 0).toLocaleString('en-IN')}</Text>

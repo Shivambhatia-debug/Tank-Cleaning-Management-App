@@ -177,7 +177,7 @@ export default function ExpensesScreen() {
             </View>
             <View style={[styles.profitBox, { borderLeftColor: '#0EA5E9' }]}>
               <Text style={styles.profitLabel}>Profit</Text>
-              <Text style={[styles.profitValue, { color: (dashStats.totalProfit || 0) >= 0 ? '#0EA5E9' : '#dc2626' }]}>₹{(dashStats.totalProfit || 0).toLocaleString('en-IN')}</Text>
+              <Text style={[styles.profitValue, { color: (dashStats.totalProfit ?? 0) >= 0 ? '#0EA5E9' : '#dc2626' }]}>₹{(dashStats.totalProfit ?? 0).toLocaleString('en-IN')}</Text>
             </View>
           </View>
           <View style={styles.profitRow}>
@@ -190,6 +190,11 @@ export default function ExpensesScreen() {
               <Text style={[styles.profitValue, { color: '#f59e0b' }]}>₹{(dashStats.monthlyExpense || 0).toLocaleString('en-IN')}</Text>
             </View>
           </View>
+          {(dashStats.totalStaffIncentive > 0 || dashStats.monthlyStaffIncentive > 0) && (
+            <Text style={styles.profitNote}>
+              Expenses include staff incentive (total ₹{(dashStats.totalStaffIncentive || 0).toLocaleString('en-IN')}, this month ₹{(dashStats.monthlyStaffIncentive || 0).toLocaleString('en-IN')}). Profit = Revenue − Expenses.
+            </Text>
+          )}
         </View>
       )}
 
@@ -381,6 +386,12 @@ const styles = StyleSheet.create({
   profitValue: {
     fontSize: 16,
     fontWeight: '700',
+  },
+  profitNote: {
+    fontSize: 11,
+    color: '#64748b',
+    marginTop: 8,
+    paddingHorizontal: 4,
   },
   loadingContainer: {
     flex: 1,

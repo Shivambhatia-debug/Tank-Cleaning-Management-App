@@ -51,11 +51,23 @@ function SectionTitle({ title }: { title: string }) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Photo thumbnail with error handling                                */
+/*  Photo thumbnail with CLEANING HERO + date/time + location overlay   */
 /* ------------------------------------------------------------------ */
 
-function PhotoThumb({ uri }: { uri: string | null }) {
+function formatPhotoMeta(meta: { at?: string | Date; latitude?: number; longitude?: number } | null) {
+  if (!meta) return { dateTime: '', location: '' };
+  const at = meta.at ? new Date(meta.at) : null;
+  const dateTime = at ? at.toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : '';
+  const lat = meta.latitude;
+  const lng = meta.longitude;
+  const location = lat != null && lng != null ? `${lat.toFixed(4)}, ${lng.toFixed(4)}` : '';
+  return { dateTime, location };
+}
+
+function PhotoThumb({ uri, meta }: { uri: string | null; meta?: { at?: string | Date; latitude?: number; longitude?: number } | null }) {
   const [error, setError] = useState(false);
+  const { dateTime, location } = formatPhotoMeta(meta || null);
+  const hasOverlay = !!(dateTime || location);
   if (!uri || error) {
     return (
       <View style={[styles.photoThumb, styles.photoPlaceholder]}>
@@ -65,12 +77,21 @@ function PhotoThumb({ uri }: { uri: string | null }) {
     );
   }
   return (
-    <Image
-      source={{ uri }}
-      style={styles.photoThumb}
-      resizeMode="cover"
-      onError={() => setError(true)}
-    />
+    <View style={styles.photoThumbWrap}>
+      <Image
+        source={{ uri }}
+        style={[StyleSheet.absoluteFill, { borderRadius: 10 }]}
+        resizeMode="cover"
+        onError={() => setError(true)}
+      />
+      <Text style={styles.photoOverlayBrand}>CLEANING HERO</Text>
+      {hasOverlay && (
+        <View style={styles.photoOverlayBottom}>
+          {dateTime ? <Text style={styles.photoOverlayText} numberOfLines={1}>{dateTime}</Text> : null}
+          {location ? <Text style={styles.photoOverlayText} numberOfLines={1}>📍 {location}</Text> : null}
+        </View>
+      )}
+    </View>
   );
 }
 
@@ -363,7 +384,7 @@ export default function AdminJobDetailScreen() {
           {hasBefore ? (
             <View style={styles.photoGridWrap}>
               {(job.photos.before as string[]).map((p: string, i: number) => (
-                <PhotoThumb key={`b-${i}`} uri={resolvePhotoUrl(p)} />
+                <PhotoThumb key={`b-${i}`} uri={resolvePhotoUrl(p)} meta={job.photosBeforeMeta?.[i]} />
               ))}
             </View>
           ) : (
@@ -385,10 +406,10 @@ export default function AdminJobDetailScreen() {
           {hasAfter ? (
             <View style={styles.photoGridWrap}>
               {(job.photos?.after || []).map((p: string, i: number) => (
-                <PhotoThumb key={`a-${i}`} uri={resolvePhotoUrl(p)} />
+                <PhotoThumb key={`a-${i}`} uri={resolvePhotoUrl(p)} meta={job.photosAfterMeta?.[i]} />
               ))}
               {!job.photos?.after?.length && (job.completionPhoto || job.completion_photo) && (
-                <PhotoThumb uri={resolvePhotoUrl(job.completionPhoto || job.completion_photo)} />
+                <PhotoThumb uri={resolvePhotoUrl(job.completionPhoto || job.completion_photo)} meta={job.photosAfterMeta?.[0]} />
               )}
             </View>
           ) : (
@@ -626,12 +647,47 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontFamily: FONT_MEDIUM,
   },
+  photoThumbWrap: {
+    width: '100%',
+    maxWidth: 260,
+    height: 130,
+    borderRadius: 10,
+    backgroundColor: '#f1f5f9',
+    overflow: 'hidden',
+  },
   photoThumb: {
     width: '100%',
     maxWidth: 260,
     height: 130,
     borderRadius: 10,
     backgroundColor: '#f1f5f9',
+  },
+  photoOverlayBrand: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    right: 6,
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#fff',
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 2,
+    fontFamily: FONT_MEDIUM,
+  },
+  photoOverlayBottom: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  photoOverlayText: {
+    fontSize: 10,
+    color: '#fff',
+    fontFamily: FONT_REGULAR,
   },
   photoPlaceholder: {
     justifyContent: 'center',

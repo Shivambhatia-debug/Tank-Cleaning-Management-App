@@ -42,15 +42,26 @@ export default function StaffJobsScreen() {
     }
   };
 
-  const totalEarned = jobs.filter((j: any) => j.status === 'completed').reduce((s: number, j: any) => s + (Number(j.incentivePerJob ?? j.incentive_per_job) || 0), 0);
+  const getIncentiveWithFuel = (j: any) => {
+    const firstStaff = (j.assignedStaff && j.assignedStaff[0]) ? j.assignedStaff[0] : null;
+    const tankCount = Number(j.tankCount ?? j.tank_count ?? 1);
+    const perTank = Number(firstStaff?.perTankIncentive ?? firstStaff?.per_tank_incentive ?? 0);
+    const perJob = Number(firstStaff?.defaultPerJobIncentive ?? firstStaff?.default_per_job_incentive ?? 0);
+    const staffFuel = Number(firstStaff?.defaultFuelExpense ?? firstStaff?.default_fuel_expense ?? 0);
+    const totalWithFuel = tankCount * perTank + perJob + staffFuel;
+    if (firstStaff && (perTank > 0 || perJob > 0 || staffFuel > 0)) return totalWithFuel;
+    return Number(j.incentivePerJob ?? j.incentive_per_job) || 0;
+  };
+
+  const totalEarned = jobs.filter((j: any) => j.status === 'completed').reduce((s: number, j: any) => s + getIncentiveWithFuel(j), 0);
   const thisMonthEarned = jobs
-    .filter((j: any) => j.status === 'completed' && j.timeline?.completedAt) 
+    .filter((j: any) => j.status === 'completed' && j.timeline?.completedAt)
     .filter((j: any) => {
       const d = new Date(j.timeline.completedAt);
       const now = new Date();
       return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
     })
-    .reduce((s: number, j: any) => s + (Number(j.incentivePerJob ?? j.incentive_per_job) || 0), 0);
+    .reduce((s: number, j: any) => s + getIncentiveWithFuel(j), 0);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -88,10 +99,23 @@ export default function StaffJobsScreen() {
   };
 
   const renderJob = ({ item }: { item: any }) => {
-    const incentive = Number(item.incentivePerJob ?? item.incentive_per_job) || 0;
+    const incentive = getIncentiveWithFuel(item);
+    const firstStaff = (item.assignedStaff && item.assignedStaff[0]) ? item.assignedStaff[0] : null;
+    const tankCount = Number(item.tankCount ?? item.tank_count ?? 1);
+    const perTank = Number(firstStaff?.perTankIncentive ?? firstStaff?.per_tank_incentive ?? 0);
+    const perJob = Number(firstStaff?.defaultPerJobIncentive ?? firstStaff?.default_per_job_incentive ?? 0);
+    const staffFuel = Number(firstStaff?.defaultFuelExpense ?? firstStaff?.default_fuel_expense ?? 0);
+    const hasBreakdown = firstStaff && (perTank > 0 || perJob > 0 || staffFuel > 0);
+    const Row = ({ label, value, valueBold }: { label: string; value: string; valueBold?: boolean }) => (
+      <View style={styles.tableRow}>
+        <Text style={styles.tableLabel}>{label}</Text>
+        <Text style={[styles.tableValue, valueBold && styles.tableValueBold]} numberOfLines={1}>{value}</Text>
+      </View>
+    );
     return (
     <TouchableOpacity
       style={styles.jobCard}
+      activeOpacity={0.8}
       onPress={() => router.push({
         pathname: '/(staff)/job-detail',
         params: { jobId: item._id }
@@ -100,35 +124,61 @@ export default function StaffJobsScreen() {
       <View style={styles.jobHeader}>
         <Text style={styles.customerName}>{item.customerName}</Text>
         <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-          <Ionicons
-            name={getStatusIcon(item.status) as any}
-            size={16}
-            color="#fff"
-          />
+          <Ionicons name={getStatusIcon(item.status) as any} size={14} color="#fff" />
           <Text style={styles.statusText}>{item.status === 'on_the_way' ? 'On the Way' : item.status.replace('_', ' ')}</Text>
         </View>
       </View>
-      <View style={styles.jobInfo}>
-        <Ionicons name="location-outline" size={16} color="#8E8E93" />
-        <Text style={styles.address} numberOfLines={2}>
-          {item.address}
-        </Text>
+
+      <View style={styles.tableBox}>
+        <Row label="Location" value={item.address || '—'} />
+        <Row label="Contact" value={item.mobileNumber || 'N/A'} />
+        <Row label="Tank" value={`${item.tankSize || '—'} • ${item.serviceType || '—'}`} />
+        <Row label="No. of tanks" value={String(tankCount)} />
+        <Row
+          label="Payment"
+          value={item.paymentStatus === 'paid' ? 'Paid' : 'Pending'}
+        />
+        <Row
+          label="Service charge"
+          value={(item.serviceCharge ?? item.service_charge) > 0 ? `₹${Number(item.serviceCharge ?? item.service_charge).toLocaleString('en-IN')}` : 'On request'}
+        />
       </View>
-      <View style={styles.jobDetails}>
-        <Text style={styles.detailLine}>📱 {item.mobileNumber || 'N/A'}</Text>
-        <Text style={styles.detailLine}>🛢 {item.tankSize || '—'} • {item.serviceType || '—'}</Text>
-        <Text style={styles.detailLine}>
-          💰 {item.paymentStatus === 'paid' ? 'Paid' : 'Pending'} • {(item.serviceCharge ?? item.service_charge) > 0 ? `₹${Number(item.serviceCharge ?? item.service_charge).toLocaleString('en-IN')}` : 'Price on request'}
-        </Text>
-        <Text style={styles.incentiveLine}>
-          👷 Incentive {item.status === 'completed' ? 'earned' : 'on completion'}: ₹{incentive.toLocaleString('en-IN')}
-        </Text>
+
+      <View style={styles.incentiveBox}>
+        <Text style={styles.incentiveBoxTitle}>Incentive {item.status === 'completed' ? 'earned' : 'on completion'}</Text>
+        {hasBreakdown ? (
+          <>
+            <View style={styles.tableRow}>
+              <Text style={styles.tableLabel}>Per tank × tanks</Text>
+              <Text style={styles.tableValue}>₹{perTank} × {tankCount}</Text>
+            </View>
+            <View style={styles.tableRow}>
+              <Text style={styles.tableLabel}>Per job</Text>
+              <Text style={styles.tableValue}>₹{perJob.toLocaleString('en-IN')}</Text>
+            </View>
+            <View style={styles.tableRow}>
+              <Text style={styles.tableLabel}>Fuel</Text>
+              <Text style={styles.tableValue}>₹{staffFuel.toLocaleString('en-IN')}</Text>
+            </View>
+            <View style={[styles.tableRow, styles.tableRowTotal]}>
+              <Text style={styles.tableLabelTotal}>Total</Text>
+              <Text style={styles.tableValueTotal}>₹{incentive.toLocaleString('en-IN')}</Text>
+            </View>
+          </>
+        ) : (
+          <View style={[styles.tableRow, styles.tableRowTotal]}>
+            <Text style={styles.tableLabel}>Total</Text>
+            <Text style={styles.tableValueTotal}>₹{incentive.toLocaleString('en-IN')}</Text>
+          </View>
+        )}
       </View>
-      {item.notes && (
-        <Text style={styles.notes} numberOfLines={2}>
-          {item.notes}
-        </Text>
-      )}
+
+      {item.notes ? (
+        <View style={styles.notesBox}>
+          <Text style={styles.notesLabel}>Notes</Text>
+          <Text style={styles.notesText} numberOfLines={2}>{item.notes}</Text>
+        </View>
+      ) : null}
       <View style={styles.jobFooter}>
         <Text style={styles.tapHint}>Tap to view details →</Text>
       </View>
@@ -195,29 +245,31 @@ const styles = StyleSheet.create({
   },
   earningsCard: {
     backgroundColor: '#fff',
-    borderRadius: 14,
+    borderRadius: 12,
     padding: 16,
     marginBottom: 14,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
     borderColor: '#e2e8f0',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   earningsTitle: {
     fontSize: 14,
     fontWeight: '700',
     color: '#0f172a',
-    marginBottom: 10,
+    marginBottom: 12,
     fontFamily: FONT_MEDIUM,
   },
   earningsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 6,
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#f1f5f9',
   },
   earningsLabel: {
     fontSize: 13,
@@ -232,22 +284,22 @@ const styles = StyleSheet.create({
   },
   jobCard: {
     backgroundColor: '#fff',
-    borderRadius: 14,
+    borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
     borderColor: '#e2e8f0',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   jobHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   customerName: {
     fontSize: 16,
@@ -259,57 +311,109 @@ const styles = StyleSheet.create({
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: 20,
     gap: 4,
   },
   statusText: {
     color: '#fff',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     textTransform: 'capitalize',
     fontFamily: FONT_MEDIUM,
   },
-  jobInfo: {
+  tableBox: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  tableRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#e2e8f0',
   },
-  address: {
-    fontSize: 13,
-    color: '#64748b',
-    flex: 1,
-    fontFamily: FONT_REGULAR,
-  },
-  jobDetails: {
-    marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#f1f5f9',
-    gap: 4,
-  },
-  detailLine: {
+  tableLabel: {
     fontSize: 12,
-    color: '#475569',
+    color: '#64748b',
     fontFamily: FONT_REGULAR,
+    flex: 1,
   },
-  incentiveLine: {
-    fontSize: 13,
-    color: '#16a34a',
+  tableValue: {
+    fontSize: 12,
+    color: '#0f172a',
+    fontFamily: FONT_MEDIUM,
+    marginLeft: 8,
+    maxWidth: '60%',
+  },
+  tableValueBold: {
     fontWeight: '700',
-    marginTop: 4,
+  },
+  incentiveBox: {
+    backgroundColor: '#f0fdf4',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+  },
+  incentiveBoxTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#166534',
+    letterSpacing: 0.5,
+    marginBottom: 8,
     fontFamily: FONT_MEDIUM,
   },
-  notes: {
+  tableRowTotal: {
+    borderBottomWidth: 0,
+    marginTop: 4,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#bbf7d0',
+  },
+  tableLabelTotal: {
     fontSize: 13,
-    color: '#64748b',
-    marginTop: 6,
+    fontWeight: '700',
+    color: '#166534',
+    fontFamily: FONT_MEDIUM,
+  },
+  tableValueTotal: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#16a34a',
+    fontFamily: FONT_MEDIUM,
+  },
+  notesBox: {
+    backgroundColor: '#fffbeb',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#fde68a',
+  },
+  notesLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#92400e',
+    marginBottom: 4,
+    fontFamily: FONT_MEDIUM,
+  },
+  notesText: {
+    fontSize: 12,
+    color: '#78350f',
     fontStyle: 'italic',
     fontFamily: FONT_REGULAR,
   },
   jobFooter: {
-    marginTop: 10,
+    marginTop: 6,
     paddingTop: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#f1f5f9',
