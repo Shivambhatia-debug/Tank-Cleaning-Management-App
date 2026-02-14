@@ -10,6 +10,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import api from '../../utils/api';
@@ -108,12 +109,45 @@ export default function ExpensesScreen() {
     }
   };
 
+  const handleDeleteExpense = (item: any) => {
+    const label = `${item.category} – ₹${(item.amount || 0).toLocaleString('en-IN')}${item.purpose ? ` (${item.purpose.slice(0, 30)}…)` : ''}`;
+    Alert.alert(
+      'Delete expense',
+      `Remove this expense?\n${label}`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await api.delete(`/expenses/${item._id}`);
+              loadExpenses();
+              if (dashStats) loadDashStats();
+            } catch (e: any) {
+              alert(e.response?.data?.message || 'Failed to delete expense');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const renderExpense = ({ item }: { item: any }) => (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
         <Text style={styles.amount}>₹{(item.amount || 0).toLocaleString('en-IN')}</Text>
-        <View style={[styles.categoryTag, styles[`cat_${item.category}` as keyof typeof styles] || null]}>
-          <Text style={styles.categoryText}>{item.category}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <View style={[styles.categoryTag, styles[`cat_${item.category}` as keyof typeof styles] || null]}>
+            <Text style={styles.categoryText}>{item.category}</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.deleteExpenseBtn}
+            onPress={() => handleDeleteExpense(item)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Text style={styles.deleteExpenseBtnText}>Delete</Text>
+          </TouchableOpacity>
         </View>
       </View>
       <Text style={styles.dateText}>
@@ -484,6 +518,15 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 999,
     backgroundColor: '#e5e7eb',
+  },
+  deleteExpenseBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  deleteExpenseBtnText: {
+    fontSize: 12,
+    color: '#dc2626',
+    fontWeight: '600',
   },
   categoryText: {
     fontSize: 11,

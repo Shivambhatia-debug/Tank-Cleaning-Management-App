@@ -921,7 +921,7 @@ export default function LeadsScreen() {
         animationType="slide"
         onRequestClose={() => setDetailModalVisible(false)}
       >
-        <SafeAreaView style={styles.fullScreenModal}>
+        <SafeAreaView style={[styles.fullScreenModal, { flex: 1 }]}>
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={() => setDetailModalVisible(false)} style={styles.modalBackBtn}>
               <Ionicons name="arrow-back" size={24} color="#0f172a" />
@@ -932,8 +932,10 @@ export default function LeadsScreen() {
           {selectedLead ? (
             <ScrollView
               style={{ flex: 1 }}
-              contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
-              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ padding: 16, paddingBottom: 40, flexGrow: 1 }}
+              showsVerticalScrollIndicator={true}
+              bounces={true}
+              nestedScrollEnabled={true}
             >
                 <View style={styles.detailHeaderRow}>
                   <Text style={styles.detailHeaderName} numberOfLines={1}>{selectedLead.customerName}</Text>

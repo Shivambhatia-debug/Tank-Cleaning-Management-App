@@ -9,6 +9,9 @@ import {
   Alert,
   Image,
   Platform,
+  Modal,
+  Linking,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -99,12 +102,15 @@ function PhotoThumb({ uri, meta }: { uri: string | null; meta?: { at?: string | 
 /*  Main screen                                                        */
 /* ------------------------------------------------------------------ */
 
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
 export default function AdminJobDetailScreen() {
   const { jobId } = useLocalSearchParams();
   const router = useRouter();
   const [job, setJob] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
+  const [fullscreenPhotoUri, setFullscreenPhotoUri] = useState<string | null>(null);
 
   useEffect(() => {
     loadJob();
@@ -383,9 +389,14 @@ export default function AdminJobDetailScreen() {
         <View style={styles.card}>
           {hasBefore ? (
             <View style={styles.photoGridWrap}>
-              {(job.photos.before as string[]).map((p: string, i: number) => (
-                <PhotoThumb key={`b-${i}`} uri={resolvePhotoUrl(p)} meta={job.photosBeforeMeta?.[i]} />
-              ))}
+              {(job.photos.before as string[]).map((p: string, i: number) => {
+                const uri = resolvePhotoUrl(p);
+                return (
+                  <TouchableOpacity key={`b-${i}`} onPress={() => uri && setFullscreenPhotoUri(uri)} activeOpacity={0.9}>
+                    <PhotoThumb uri={uri} meta={job.photosBeforeMeta?.[i]} />
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           ) : (
             <View style={{ alignItems: 'center', paddingVertical: 16 }}>
@@ -405,12 +416,22 @@ export default function AdminJobDetailScreen() {
         <View style={styles.card}>
           {hasAfter ? (
             <View style={styles.photoGridWrap}>
-              {(job.photos?.after || []).map((p: string, i: number) => (
-                <PhotoThumb key={`a-${i}`} uri={resolvePhotoUrl(p)} meta={job.photosAfterMeta?.[i]} />
-              ))}
-              {!job.photos?.after?.length && (job.completionPhoto || job.completion_photo) && (
-                <PhotoThumb uri={resolvePhotoUrl(job.completionPhoto || job.completion_photo)} meta={job.photosAfterMeta?.[0]} />
-              )}
+              {(job.photos?.after || []).map((p: string, i: number) => {
+                const uri = resolvePhotoUrl(p);
+                return (
+                  <TouchableOpacity key={`a-${i}`} onPress={() => uri && setFullscreenPhotoUri(uri)} activeOpacity={0.9}>
+                    <PhotoThumb uri={uri} meta={job.photosAfterMeta?.[i]} />
+                  </TouchableOpacity>
+                );
+              })}
+              {!job.photos?.after?.length && (job.completionPhoto || job.completion_photo) && (() => {
+                const uri = resolvePhotoUrl(job.completionPhoto || job.completion_photo);
+                return (
+                  <TouchableOpacity onPress={() => uri && setFullscreenPhotoUri(uri)} activeOpacity={0.9}>
+                    <PhotoThumb uri={uri} meta={job.photosAfterMeta?.[0]} />
+                  </TouchableOpacity>
+                );
+              })()}
             </View>
           ) : (
             <View style={{ alignItems: 'center', paddingVertical: 16 }}>
@@ -488,6 +509,27 @@ export default function AdminJobDetailScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Fullscreen photo modal + download */}
+      <Modal visible={!!fullscreenPhotoUri} transparent animationType="fade">
+        <View style={styles.fullscreenPhotoBackdrop}>
+          <TouchableOpacity style={styles.fullscreenPhotoClose} onPress={() => setFullscreenPhotoUri(null)}>
+            <Ionicons name="close" size={28} color="#fff" />
+          </TouchableOpacity>
+          {fullscreenPhotoUri ? (
+            <Image source={{ uri: fullscreenPhotoUri }} style={styles.fullscreenPhotoImage} resizeMode="contain" />
+          ) : null}
+          <View style={styles.fullscreenPhotoActions}>
+            <TouchableOpacity
+              style={styles.fullscreenPhotoDownloadBtn}
+              onPress={() => { if (fullscreenPhotoUri) Linking.openURL(fullscreenPhotoUri); }}
+            >
+              <Ionicons name="download-outline" size={20} color="#fff" />
+              <Text style={styles.fullscreenPhotoDownloadText}>Download / Open</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -775,6 +817,47 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '700',
+    fontFamily: FONT_MEDIUM,
+  },
+
+  /* Fullscreen photo modal */
+  fullscreenPhotoBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.92)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullscreenPhotoClose: {
+    position: 'absolute',
+    top: 48,
+    right: 16,
+    zIndex: 10,
+    padding: 8,
+  },
+  fullscreenPhotoImage: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT * 0.7,
+  },
+  fullscreenPhotoActions: {
+    position: 'absolute',
+    bottom: 48,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  fullscreenPhotoDownloadBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  fullscreenPhotoDownloadText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
     fontFamily: FONT_MEDIUM,
   },
 });
