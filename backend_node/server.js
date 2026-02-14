@@ -722,7 +722,8 @@ app.post('/api/jobs', auth, async (req, res) => {
             notes,
             targetLatitude,
             targetLongitude,
-            incentivePerJob
+            incentivePerJob,
+            tankCount
         } = req.body;
 
         if (!customerName || !address) {
@@ -738,6 +739,7 @@ app.post('/api/jobs', auth, async (req, res) => {
             latitude,
             longitude,
             tankSize,
+            tankCount: tankCount != null ? Number(tankCount) || 1 : 1,
             serviceType,
             leadSource,
             mobileNumber,

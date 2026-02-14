@@ -23,6 +23,10 @@ const jobSchema = new mongoose.Schema({
         type: String, // 500L, 1000L, etc.
         default: ''
     },
+    tankCount: {
+        type: Number, // number of tanks (e.g. 2) for incentive = tankCount * perTankIncentive + perJobIncentive
+        default: 1
+    },
     serviceType: {
         type: String, // Water Tank, Septic, etc.
         default: ''

@@ -79,7 +79,9 @@ export default function LiveMapScreen() {
     );
   }
 
-  const inProgressJobs = jobs.filter((j: any) => j.status === 'in_progress');
+  const activeJobsForTracking = jobs.filter(
+    (j: any) => j.status === 'on_the_way' || j.status === 'in_progress'
+  );
 
   // Pehle job list dikhao — map mat dikhao
   if (!selectedJobForMap) {
@@ -101,13 +103,13 @@ export default function LiveMapScreen() {
           contentContainerStyle={styles.jobListContent}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
-          {inProgressJobs.length === 0 ? (
+          {activeJobsForTracking.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyTitle}>No active jobs</Text>
-              <Text style={styles.emptySubtitle}>Jobs with status &quot;In progress&quot; will appear here. Tap one to see map.</Text>
+              <Text style={styles.emptySubtitle}>Jobs with status &quot;On the way&quot; or &quot;In progress&quot; will appear here. Tap one to see location on map.</Text>
             </View>
           ) : (
-            inProgressJobs.map((job: any) => {
+            activeJobsForTracking.map((job: any) => {
               const name = job.customerName || job.customer_name || 'Job';
               const staffCount = (job.assignedStaff || []).length;
               return (
@@ -120,7 +122,7 @@ export default function LiveMapScreen() {
                   <Text style={styles.jobListCardTitle}>{name}</Text>
                   <Text style={styles.jobListCardAddress} numberOfLines={2}>{job.address}</Text>
                   <Text style={styles.jobListCardMeta}>
-                    👷 {staffCount} staff assigned • Tap to see map
+                    {job.status === 'on_the_way' ? '🚗 On the way' : '🔄 In progress'} • 👷 {staffCount} staff • Tap to see map
                   </Text>
                 </TouchableOpacity>
               );

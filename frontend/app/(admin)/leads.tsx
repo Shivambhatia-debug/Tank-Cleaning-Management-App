@@ -465,15 +465,23 @@ export default function LeadsScreen() {
       let latFromLead = (selectedLead as any).latitude as number | null | undefined;
       let lngFromLead = (selectedLead as any).longitude as number | null | undefined;
 
+      const tankCount = selectedLead.numberOfTanks ?? 1;
+      const firstStaffId = selectedJobStaffIds[0];
+      const firstStaff = staff.find((s: any) => s._id === firstStaffId);
+      const perTank = Number(firstStaff?.perTankIncentive) || 0;
+      const perJob = Number(firstStaff?.defaultPerJobIncentive ?? firstStaff?.default_per_job_incentive) || 0;
+      const incentivePerJob = Math.round(tankCount * perTank + perJob);
+
       const payload: any = {
         customerName: selectedLead.customerName,
         mobileNumber: selectedLead.mobileNumber,
         address: addressFromLead,
-        tankSize: '500L',
-        serviceType: 'Water Tank',
+        tankSize: selectedLead.tankSizeLtr ? `${selectedLead.tankSizeLtr}L` : '500L',
+        tankCount,
+        serviceType: selectedLead.serviceType || 'Water Tank',
         leadSource: selectedLead.source || 'Lead',
         serviceCharge: 0,
-        incentivePerJob: 20,
+        incentivePerJob,
         paymentMode: 'pending',
         assignedStaff: selectedJobStaffIds,
         notes: `Job created from lead ${selectedLead._id}`,

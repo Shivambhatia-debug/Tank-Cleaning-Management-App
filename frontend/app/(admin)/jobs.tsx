@@ -78,11 +78,12 @@ export default function JobsManagementScreen() {
     // CRM Fields
     mobile_number: '',
     tank_size: '500L',
+    tank_count: 1,
     service_type: 'Water Tank',
     lead_source: 'Call',
     service_charge: '',
     scheduled_at: '',
-    incentive_per_job: '20',
+    incentive_per_job: '',
     payment_mode: 'pending',
   });
 
@@ -141,6 +142,7 @@ export default function JobsManagementScreen() {
         // New CRM fields
         mobileNumber: mobileDigits || newJob.mobile_number,
         tankSize: newJob.tank_size,
+        tankCount: Number(newJob.tank_count) || 1,
         serviceType: newJob.service_type,
         leadSource: newJob.lead_source,
         serviceCharge: Number(newJob.service_charge) || 0,
@@ -175,27 +177,39 @@ export default function JobsManagementScreen() {
       notes: '',
       mobile_number: '',
       tank_size: '500L',
+      tank_count: 1,
       service_type: 'Water Tank',
       lead_source: 'Call',
       service_charge: '',
+      scheduled_at: '',
+      incentive_per_job: '',
+      payment_mode: 'pending',
     });
   };
 
+  const recalcIncentiveFromStaff = (staffIds: string[], tankCount: number) => {
+    if (staffIds.length === 0 || tankCount < 1) return '';
+    const s = staff.find((st: any) => st._id === staffIds[0]);
+    if (!s) return '';
+    const perTank = Number(s.perTankIncentive) || 0;
+    const perJob = Number(s.defaultPerJobIncentive ?? s.default_per_job_incentive) || 0;
+    return String(Math.round(tankCount * perTank + perJob));
+  };
+
   const toggleStaffSelection = (staffId: string) => {
+    const tankCount = Number(newJob.tank_count) || 1;
     if (newJob.assigned_staff_ids.includes(staffId)) {
+      const nextIds = newJob.assigned_staff_ids.filter((id) => id !== staffId);
+      const incentive = recalcIncentiveFromStaff(nextIds, tankCount);
       setNewJob({
         ...newJob,
-        assigned_staff_ids: newJob.assigned_staff_ids.filter((id) => id !== staffId),
+        assigned_staff_ids: nextIds,
+        incentive_per_job: incentive,
       });
     } else {
       const nextIds = [...newJob.assigned_staff_ids, staffId];
-      const updates: any = { ...newJob, assigned_staff_ids: nextIds };
-      if (nextIds.length === 1) {
-        const s = staff.find((st: any) => st._id === staffId);
-        const def = s?.defaultPerJobIncentive ?? s?.default_per_job_incentive;
-        if (def != null && def !== '') updates.incentive_per_job = String(def);
-      }
-      setNewJob(updates);
+      const incentive = recalcIncentiveFromStaff(nextIds, tankCount);
+      setNewJob({ ...newJob, assigned_staff_ids: nextIds, incentive_per_job: incentive });
     }
   };
 
@@ -533,6 +547,24 @@ export default function JobsManagementScreen() {
                 </View>
                 <View style={{ width: 10 }} />
                 <View style={styles.col}>
+                  <Text style={styles.label}>Number of tanks</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="1"
+                    value={newJob.tank_count ? String(newJob.tank_count) : '1'}
+                    keyboardType="numeric"
+                    onChangeText={(text) => {
+                      const n = Math.max(1, parseInt(text, 10) || 1);
+                      const incentive = newJob.assigned_staff_ids.length
+                        ? recalcIncentiveFromStaff(newJob.assigned_staff_ids, n)
+                        : newJob.incentive_per_job;
+                      setNewJob({ ...newJob, tank_count: n, incentive_per_job: incentive });
+                    }}
+                  />
+                </View>
+              </View>
+              <View style={styles.row}>
+                <View style={styles.col}>
                   <Text style={styles.label}>Service Charge</Text>
                   <TextInput
                     style={styles.input}
@@ -556,7 +588,7 @@ export default function JobsManagementScreen() {
               <Text style={styles.label}>Per job incentive (₹)</Text>
               <TextInput
                 style={styles.input}
-                placeholder="e.g. 20"
+                placeholder="Auto: tanks × per tank + per job"
                 value={newJob.incentive_per_job}
                 onChangeText={(text) => setNewJob({ ...newJob, incentive_per_job: text })}
                 keyboardType="numeric"
