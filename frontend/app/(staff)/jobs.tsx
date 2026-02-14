@@ -61,6 +61,8 @@ export default function StaffJobsScreen() {
     switch (status) {
       case 'pending':
         return '#FF9500';
+      case 'on_the_way':
+        return '#f59e0b';
       case 'in_progress':
         return '#34C759';
       case 'completed':
@@ -74,6 +76,8 @@ export default function StaffJobsScreen() {
     switch (status) {
       case 'pending':
         return 'time-outline';
+      case 'on_the_way':
+        return 'car-outline';
       case 'in_progress':
         return 'play-circle-outline';
       case 'completed':
@@ -101,7 +105,7 @@ export default function StaffJobsScreen() {
             size={16}
             color="#fff"
           />
-          <Text style={styles.statusText}>{item.status.replace('_', ' ')}</Text>
+          <Text style={styles.statusText}>{item.status === 'on_the_way' ? 'On the Way' : item.status.replace('_', ' ')}</Text>
         </View>
       </View>
       <View style={styles.jobInfo}>

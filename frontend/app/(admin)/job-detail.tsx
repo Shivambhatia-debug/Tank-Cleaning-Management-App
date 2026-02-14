@@ -26,6 +26,8 @@ function getStatusColor(status: string) {
   switch (status) {
     case 'pending':
       return '#FF9500';
+    case 'on_the_way':
+      return '#f59e0b';
     case 'in_progress':
       return '#34C759';
     case 'completed':
@@ -179,12 +181,12 @@ export default function AdminJobDetailScreen() {
   let progressColor = '#94a3b8';
   if (job.status === 'pending') {
     progressStep = 'Waiting for staff to start';
+    progressColor = '#94a3b8';
+  } else if (job.status === 'on_the_way') {
+    progressStep = 'Staff is on the way to location';
     progressColor = '#f59e0b';
   } else if (job.status === 'in_progress') {
-    if (!hasBefore) {
-      progressStep = 'Started — waiting for before photos';
-      progressColor = '#f59e0b';
-    } else if (!hasAfter) {
+    if (!hasAfter) {
       progressStep = `Work in progress (${beforeCount} before photo${beforeCount !== 1 ? 's' : ''})`;
       progressColor = '#0EA5E9';
     } else {
@@ -251,7 +253,12 @@ export default function AdminJobDetailScreen() {
           </View>
           {job.timeline?.startedAt && (
             <Text style={{ fontSize: 11, color: '#64748b', marginTop: 8, fontFamily: FONT_REGULAR }}>
-              Started: {new Date(job.timeline.startedAt).toLocaleString()}
+              On the Way: {new Date(job.timeline.startedAt).toLocaleString()}
+            </Text>
+          )}
+          {job.timeline?.arrivedAt && (
+            <Text style={{ fontSize: 11, color: '#0EA5E9', marginTop: 2, fontFamily: FONT_REGULAR }}>
+              Arrived (Before Photo): {new Date(job.timeline.arrivedAt).toLocaleString()}
             </Text>
           )}
           {job.timeline?.completedAt && (

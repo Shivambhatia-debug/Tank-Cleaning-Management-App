@@ -32,9 +32,9 @@ const MAX_PHOTOS = 10;
 function StepIndicator({ currentStep }: { currentStep: number }) {
   const steps = [
     { label: 'Start', icon: 'play-circle' as const },
-    { label: 'Before\nPhotos', icon: 'camera' as const },
-    { label: 'Working', icon: 'construct' as const },
-    { label: 'After\nPhotos', icon: 'camera-reverse' as const },
+    { label: 'On the\nWay', icon: 'car' as const },
+    { label: 'Before\nPhoto', icon: 'camera' as const },
+    { label: 'After\nPhoto', icon: 'camera-reverse' as const },
     { label: 'Complete', icon: 'checkmark-circle' as const },
   ];
 
@@ -239,10 +239,21 @@ export default function JobDetailScreen() {
   const handleStartJob = async () => {
     Alert.alert(
       'Start Job',
-      'You are about to start this job. You will need to take at least 1 before photo of the tank/site.',
+      'Are you ready to head to the job location? Your location will be tracked by admin.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Start & Take Photo', onPress: () => pickAndUploadPhoto('before') },
+        {
+          text: "I'm on my way!",
+          onPress: async () => {
+            try {
+              await api.put(`/jobs/${jobId}`, { status: 'on_the_way' });
+              Alert.alert('Job Started!', 'Navigate to the location. Take a before photo when you arrive.');
+              loadJob();
+            } catch (err: any) {
+              Alert.alert('Error', err.response?.data?.message || 'Failed to start job');
+            }
+          },
+        },
       ]
     );
   };
@@ -299,18 +310,18 @@ export default function JobDetailScreen() {
   const afterCount = job?.photos?.after?.length || 0;
   const isPaid = job?.paymentStatus === 'paid';
 
-  // Calculate current step: 0=Start, 1=Before photos, 2=Working, 3=After photos, 4=Complete
+  // Calculate current step: 0=Start, 1=On the Way, 2=Before Photo, 3=After Photo, 4=Complete
   let currentStep = 0;
   if (job) {
     if (job.status === 'pending') {
       currentStep = 0;
+    } else if (job.status === 'on_the_way') {
+      currentStep = 1;
     } else if (job.status === 'in_progress') {
-      if (!hasBefore) {
-        currentStep = 1;
-      } else if (!hasAfter) {
-        currentStep = 2;
+      if (!hasAfter) {
+        currentStep = 2; // Working, waiting for after photos
       } else {
-        currentStep = 3;
+        currentStep = 3; // After photos uploaded
       }
     } else if (job.status === 'completed') {
       currentStep = 4;
@@ -341,8 +352,8 @@ export default function JobDetailScreen() {
           <Ionicons name="arrow-back" size={22} color="#0f172a" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Job Details</Text>
-        <View style={[styles.statusPill, { backgroundColor: job.status === 'completed' ? '#16a34a' : job.status === 'in_progress' ? '#f59e0b' : '#94a3b8' }]}>
-          <Text style={styles.statusPillText}>{job.status.replace('_', ' ').toUpperCase()}</Text>
+        <View style={[styles.statusPill, { backgroundColor: job.status === 'completed' ? '#16a34a' : job.status === 'in_progress' ? '#0EA5E9' : job.status === 'on_the_way' ? '#f59e0b' : '#94a3b8' }]}>
+          <Text style={styles.statusPillText}>{job.status === 'on_the_way' ? 'ON THE WAY' : job.status.replace('_', ' ').toUpperCase()}</Text>
         </View>
       </View>
 
@@ -441,25 +452,76 @@ export default function JobDetailScreen() {
               <Text style={styles.actionCardTitle}>Ready to Start?</Text>
             </View>
             <Text style={styles.actionCardDesc}>
-              Tap below to start this job. You'll need to take a photo of the tank/site before you begin work.
+              Tap below to start heading to the job location. Admin will track your location as you travel.
             </Text>
             <TouchableOpacity
               style={[styles.actionBtn, { backgroundColor: '#0EA5E9' }]}
               onPress={handleStartJob}
-              disabled={uploading}
             >
-              {uploading ? <ActivityIndicator color="#fff" /> : (
-                <>
-                  <Ionicons name="camera" size={20} color="#fff" />
-                  <Text style={styles.actionBtnText}>Start Job & Take Before Photo</Text>
-                </>
-              )}
+              <Ionicons name="car" size={20} color="#fff" />
+              <Text style={styles.actionBtnText}>Start Job — I'm on my way!</Text>
             </TouchableOpacity>
           </View>
         )}
 
         {/* ============================================================ */}
-        {/* STEP 2: BEFORE PHOTOS (in_progress, add more before photos) */}
+        {/* STEP 2: ON THE WAY → Take Before Photo when arrived */}
+        {/* ============================================================ */}
+        {job.status === 'on_the_way' && (
+          <>
+            {/* On the way status card */}
+            <View style={[styles.actionCard, { borderColor: '#fde68a', backgroundColor: '#fffbeb' }]}>
+              <View style={styles.actionCardHeader}>
+                <Ionicons name="car" size={24} color="#f59e0b" />
+                <Text style={[styles.actionCardTitle, { color: '#f59e0b' }]}>On the Way</Text>
+              </View>
+              <Text style={styles.actionCardDesc}>
+                Admin is tracking your location. When you arrive at the job site, take a before photo of the tank to start the work.
+              </Text>
+              {job.timeline?.startedAt && (
+                <Text style={{ fontSize: 11, color: '#92400e', marginBottom: 10, fontFamily: FONT_REGULAR }}>
+                  Started at: {new Date(job.timeline.startedAt).toLocaleString()}
+                </Text>
+              )}
+              <TouchableOpacity
+                style={[styles.actionBtn, { backgroundColor: '#f59e0b' }]}
+                onPress={() => pickAndUploadPhoto('before')}
+                disabled={uploading}
+              >
+                {uploading ? <ActivityIndicator color="#fff" /> : (
+                  <>
+                    <Ionicons name="camera" size={20} color="#fff" />
+                    <Text style={styles.actionBtnText}>Arrived! Take Before Photo</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {/* Navigate to location */}
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>NAVIGATE TO LOCATION</Text>
+              <TouchableOpacity
+                style={styles.mapsBtn}
+                onPress={() => {
+                  const lat = job.latitude ?? 0;
+                  const lng = job.longitude ?? 0;
+                  const url = Platform.select({
+                    ios: `maps://app?daddr=${lat},${lng}`,
+                    android: `geo:${lat},${lng}?q=${lat},${lng}`,
+                    default: `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`,
+                  });
+                  Linking.openURL(url!).catch(() => Linking.openURL(`https://www.google.com/maps?q=${lat},${lng}`));
+                }}
+              >
+                <Ionicons name="navigate" size={16} color="#fff" />
+                <Text style={styles.mapsBtnText}>Open in Maps</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+
+        {/* ============================================================ */}
+        {/* STEP 3: BEFORE PHOTOS (in_progress, add more before photos) */}
         {/* ============================================================ */}
         {job.status === 'in_progress' && (
           <View style={styles.card}>
@@ -508,7 +570,7 @@ export default function JobDetailScreen() {
         )}
 
         {/* ============================================================ */}
-        {/* STEP 3: AFTER PHOTOS (in_progress, work done, upload after) */}
+        {/* STEP 4: AFTER PHOTOS (in_progress, work done, upload after) */}
         {/* ============================================================ */}
         {job.status === 'in_progress' && (
           <View style={styles.card}>
@@ -559,7 +621,7 @@ export default function JobDetailScreen() {
         )}
 
         {/* ============================================================ */}
-        {/* STEP 4: PAYMENT & REMARK (in_progress) */}
+        {/* STEP 5: PAYMENT & REMARK (in_progress) */}
         {/* ============================================================ */}
         {job.status === 'in_progress' && (
           <View style={styles.card}>
@@ -613,7 +675,7 @@ export default function JobDetailScreen() {
         )}
 
         {/* ============================================================ */}
-        {/* STEP 5: COMPLETE JOB BUTTON (in_progress + has after photos) */}
+        {/* STEP 6: COMPLETE JOB BUTTON (in_progress + has after photos) */}
         {/* ============================================================ */}
         {job.status === 'in_progress' && hasAfter && (
           <View style={styles.actionCard}>
@@ -644,11 +706,14 @@ export default function JobDetailScreen() {
                 <Ionicons name="checkmark-circle" size={24} color="#16a34a" />
                 <Text style={{ fontSize: 16, fontWeight: '700', color: '#16a34a', fontFamily: FONT_MEDIUM }}>Job Completed</Text>
               </View>
+              {job.timeline?.startedAt && (
+                <Text style={styles.metaText}>On the Way: {new Date(job.timeline.startedAt).toLocaleString()}</Text>
+              )}
+              {job.timeline?.arrivedAt && (
+                <Text style={styles.metaText}>Arrived: {new Date(job.timeline.arrivedAt).toLocaleString()}</Text>
+              )}
               {job.timeline?.completedAt && (
                 <Text style={styles.metaText}>Completed: {new Date(job.timeline.completedAt).toLocaleString()}</Text>
-              )}
-              {job.timeline?.startedAt && (
-                <Text style={styles.metaText}>Started: {new Date(job.timeline.startedAt).toLocaleString()}</Text>
               )}
             </View>
 

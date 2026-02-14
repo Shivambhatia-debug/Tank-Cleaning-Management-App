@@ -80,9 +80,10 @@ const jobSchema = new mongoose.Schema({
     }],
 
     // Job Status (service ki journey)
+    // pending → on_the_way → in_progress → completed
     status: {
         type: String,
-        enum: ['pending', 'in_progress', 'completed'],
+        enum: ['pending', 'on_the_way', 'in_progress', 'completed'],
         default: 'pending'
     },
     notes: {
@@ -125,8 +126,9 @@ const jobSchema = new mongoose.Schema({
 
     timeline: {
         createdAt: { type: Date, default: Date.now },
-        startedAt: Date,
-        completedAt: Date
+        startedAt: Date,        // when staff taps "Start Job" (on_the_way)
+        arrivedAt: Date,        // when staff uploads first before photo (in_progress)
+        completedAt: Date       // when job marked complete
     }
 });
 

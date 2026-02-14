@@ -834,7 +834,8 @@ app.put('/api/jobs/:id', auth, async (req, res) => {
         if (incentivePerJob != null) updates.incentivePerJob = Number(incentivePerJob) || 0;
         if (scheduledAt) updates.scheduledAt = new Date(scheduledAt);
 
-        if (status === 'in_progress') updates['timeline.startedAt'] = new Date();
+        if (status === 'on_the_way') updates['timeline.startedAt'] = new Date();
+        if (status === 'in_progress') updates['timeline.arrivedAt'] = new Date();
         if (status === 'completed') {
             // Require at least 1 after photo before completing
             const existingJob = await Job.findById(req.params.id);
@@ -949,11 +950,15 @@ app.post('/api/jobs/:id/upload-before', auth, upload.single('photo'), async (req
         const updates = {
             $push: { 'photos.before': photoUrl },
             status: 'in_progress',
-            'timeline.startedAt': timestamp,
+            'timeline.arrivedAt': timestamp,
             beforePhotoAt: timestamp,
             beforePhotoLatitude: lat,
             beforePhotoLongitude: lng,
         };
+        // If staff hasn't started yet (still pending), also set startedAt
+        if (existingJob.status === 'pending') {
+            updates['timeline.startedAt'] = timestamp;
+        }
         const job = await Job.findByIdAndUpdate(req.params.id, updates, { new: true });
         if (!job) return res.status(404).json({ message: 'Job not found' });
         res.json({
@@ -1071,6 +1076,7 @@ app.get('/api/stats/dashboard', auth, requireDb, async (req, res) => {
     try {
         const totalJobs = await Job.countDocuments();
         const pendingJobs = await Job.countDocuments({ status: 'pending' });
+        const onTheWayJobs = await Job.countDocuments({ status: 'on_the_way' });
         const inProgressJobs = await Job.countDocuments({ status: 'in_progress' });
         const completedJobs = await Job.countDocuments({ status: 'completed' });
         const activeStaff = await User.countDocuments({ role: 'staff', isActive: true });
@@ -1078,6 +1084,7 @@ app.get('/api/stats/dashboard', auth, requireDb, async (req, res) => {
         res.json({
             totalJobs,
             pendingJobs,
+            onTheWayJobs,
             inProgressJobs,
             completedJobs,
             activeStaff

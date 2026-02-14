@@ -122,6 +122,16 @@ export default function DashboardScreen() {
               </View>
             </View>
 
+            <View style={[styles.statCard, { borderLeftColor: '#f59e0b', borderLeftWidth: 4 }]}>
+              <View style={styles.statIcon}>
+                <Text style={styles.iconText}>🚗</Text>
+              </View>
+              <View style={styles.statContent}>
+                <Text style={styles.statValue}>{stats?.onTheWayJobs || 0}</Text>
+                <Text style={styles.statLabel}>On the Way</Text>
+              </View>
+            </View>
+
             <View style={[styles.statCard, styles.successCard]}>
               <View style={styles.statIcon}>
                 <Text style={styles.iconText}>🔄</Text>

@@ -203,6 +203,8 @@ export default function JobsManagementScreen() {
     switch (status) {
       case 'pending':
         return '#FF9500';
+      case 'on_the_way':
+        return '#f59e0b';
       case 'in_progress':
         return '#34C759';
       case 'completed':
@@ -254,7 +256,7 @@ export default function JobsManagementScreen() {
         <Text style={styles.customerName}>{item.customerName}</Text>
         <View style={styles.jobHeaderRight}>
           <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-            <Text style={styles.statusText}>{item.status.replace('_', ' ')}</Text>
+            <Text style={styles.statusText}>{item.status === 'on_the_way' ? 'On the Way' : item.status.replace('_', ' ')}</Text>
           </View>
           <TouchableOpacity
             style={styles.deleteJobButton}
@@ -328,7 +330,10 @@ export default function JobsManagementScreen() {
             <Text style={[styles.photoProgressText, { color: '#22c55e' }]}>After: {item.photos?.after?.length || 0}</Text>
           </View>
           {item.timeline?.startedAt && (
-            <Text style={{ fontSize: 10, color: '#94a3b8' }}>Started {new Date(item.timeline.startedAt).toLocaleDateString()}</Text>
+            <Text style={{ fontSize: 10, color: '#f59e0b' }}>On Way {new Date(item.timeline.startedAt).toLocaleDateString()}</Text>
+          )}
+          {item.timeline?.arrivedAt && (
+            <Text style={{ fontSize: 10, color: '#0EA5E9' }}>Arrived {new Date(item.timeline.arrivedAt).toLocaleDateString()}</Text>
           )}
           {item.timeline?.completedAt && (
             <Text style={{ fontSize: 10, color: '#16a34a' }}>Done {new Date(item.timeline.completedAt).toLocaleDateString()}</Text>
@@ -384,7 +389,7 @@ export default function JobsManagementScreen() {
 
       <View style={styles.filterContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {['all', 'pending', 'in_progress', 'completed'].map((status) => (
+          {['all', 'pending', 'on_the_way', 'in_progress', 'completed'].map((status) => (
             <TouchableOpacity
               key={status}
               style={[
@@ -399,7 +404,7 @@ export default function JobsManagementScreen() {
                   filterStatus === status && styles.filterTextActive,
                 ]}
               >
-                {status.replace('_', ' ').toUpperCase()}
+                {status === 'on_the_way' ? 'ON THE WAY' : status.replace('_', ' ').toUpperCase()}
               </Text>
             </TouchableOpacity>
           ))}
