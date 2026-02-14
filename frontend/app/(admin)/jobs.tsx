@@ -316,36 +316,22 @@ export default function JobsManagementScreen() {
         )}
       </View>
 
-      {/* Before / After Photos */}
+      {/* Photo Progress Bar */}
       {(item.photos?.before?.length > 0 || item.photos?.after?.length > 0 || item.completionPhoto || item.completion_photo) && (
-        <View style={{ marginBottom: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#eee' }}>
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            {/* Before */}
-            {item.photos?.before?.length > 0 && (
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 11, color: '#f59e0b', fontWeight: '700', marginBottom: 4 }}>BEFORE</Text>
-                {item.photos.before.slice(0, 2).map((p: string, idx: number) => (
-                  <CompletionPhotoImage key={`b-${idx}`} photoPath={p} style={styles.completionThumb} />
-                ))}
-              </View>
-            )}
-            {/* After */}
-            {(item.photos?.after?.length > 0 || item.completionPhoto || item.completion_photo) && (
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 11, color: '#22c55e', fontWeight: '700', marginBottom: 4 }}>AFTER</Text>
-                {item.photos?.after?.length > 0
-                  ? item.photos.after.slice(0, 2).map((p: string, idx: number) => (
-                      <CompletionPhotoImage key={`a-${idx}`} photoPath={p} style={styles.completionThumb} />
-                    ))
-                  : <CompletionPhotoImage photoPath={item.completionPhoto || item.completion_photo} style={styles.completionThumb} />
-                }
-              </View>
-            )}
+        <View style={styles.photoProgressBar}>
+          <View style={styles.photoProgressItem}>
+            <Ionicons name="camera-outline" size={13} color="#f59e0b" />
+            <Text style={[styles.photoProgressText, { color: '#f59e0b' }]}>Before: {item.photos?.before?.length || 0}</Text>
           </View>
-          {(item.completionPhotoAt || item.completion_photo_at) && (
-            <Text style={{ fontSize: 11, color: '#666', marginTop: 4 }}>
-              Completed: {new Date(item.completionPhotoAt || item.completion_photo_at).toLocaleDateString()} {new Date(item.completionPhotoAt || item.completion_photo_at).toLocaleTimeString()}
-            </Text>
+          <View style={styles.photoProgressItem}>
+            <Ionicons name="camera-reverse-outline" size={13} color="#22c55e" />
+            <Text style={[styles.photoProgressText, { color: '#22c55e' }]}>After: {item.photos?.after?.length || 0}</Text>
+          </View>
+          {item.timeline?.startedAt && (
+            <Text style={{ fontSize: 10, color: '#94a3b8' }}>Started {new Date(item.timeline.startedAt).toLocaleDateString()}</Text>
+          )}
+          {item.timeline?.completedAt && (
+            <Text style={{ fontSize: 10, color: '#16a34a' }}>Done {new Date(item.timeline.completedAt).toLocaleDateString()}</Text>
           )}
         </View>
       )}
@@ -1091,6 +1077,26 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#0f172a',
+    fontFamily: FONT_MEDIUM,
+  },
+  photoProgressBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingTop: 8,
+    paddingBottom: 4,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#e2e8f0',
+    marginTop: 4,
+  },
+  photoProgressItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  photoProgressText: {
+    fontSize: 11,
+    fontWeight: '600',
     fontFamily: FONT_MEDIUM,
   },
 });

@@ -24,6 +24,111 @@ import { Ionicons } from '@expo/vector-icons';
 const FONT_REGULAR = Platform.select({ ios: 'Avenir Next', android: 'sans-serif', default: 'System' });
 const FONT_MEDIUM = Platform.select({ ios: 'Avenir Next', android: 'sans-serif-medium', default: 'System' });
 
+const MAX_PHOTOS = 10;
+
+/* ------------------------------------------------------------------ */
+/*  Step Progress Indicator                                            */
+/* ------------------------------------------------------------------ */
+function StepIndicator({ currentStep }: { currentStep: number }) {
+  const steps = [
+    { label: 'Start', icon: 'play-circle' as const },
+    { label: 'Before\nPhotos', icon: 'camera' as const },
+    { label: 'Working', icon: 'construct' as const },
+    { label: 'After\nPhotos', icon: 'camera-reverse' as const },
+    { label: 'Complete', icon: 'checkmark-circle' as const },
+  ];
+
+  return (
+    <View style={stepStyles.container}>
+      {steps.map((step, idx) => {
+        const isDone = idx < currentStep;
+        const isActive = idx === currentStep;
+        const isLast = idx === steps.length - 1;
+        return (
+          <React.Fragment key={idx}>
+            <View style={stepStyles.stepItem}>
+              <View style={[
+                stepStyles.circle,
+                isDone && stepStyles.circleDone,
+                isActive && stepStyles.circleActive,
+              ]}>
+                {isDone ? (
+                  <Ionicons name="checkmark" size={14} color="#fff" />
+                ) : (
+                  <Ionicons name={step.icon} size={14} color={isActive ? '#fff' : '#94a3b8'} />
+                )}
+              </View>
+              <Text style={[
+                stepStyles.label,
+                isDone && stepStyles.labelDone,
+                isActive && stepStyles.labelActive,
+              ]} numberOfLines={2}>
+                {step.label}
+              </Text>
+            </View>
+            {!isLast && (
+              <View style={[stepStyles.line, isDone && stepStyles.lineDone]} />
+            )}
+          </React.Fragment>
+        );
+      })}
+    </View>
+  );
+}
+
+const stepStyles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 16,
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    marginBottom: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  stepItem: { alignItems: 'center', width: 52 },
+  circle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#f1f5f9',
+    borderWidth: 2,
+    borderColor: '#e2e8f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  circleDone: { backgroundColor: '#16a34a', borderColor: '#16a34a' },
+  circleActive: { backgroundColor: '#0EA5E9', borderColor: '#0EA5E9' },
+  label: {
+    fontSize: 9,
+    color: '#94a3b8',
+    marginTop: 4,
+    textAlign: 'center',
+    fontFamily: FONT_REGULAR,
+  },
+  labelDone: { color: '#16a34a', fontWeight: '600' },
+  labelActive: { color: '#0EA5E9', fontWeight: '700' },
+  line: {
+    flex: 1,
+    height: 2,
+    backgroundColor: '#e2e8f0',
+    marginTop: 14,
+    marginHorizontal: 2,
+  },
+  lineDone: { backgroundColor: '#16a34a' },
+});
+
+/* ------------------------------------------------------------------ */
+/*  Main Screen                                                        */
+/* ------------------------------------------------------------------ */
 export default function JobDetailScreen() {
   const { jobId } = useLocalSearchParams();
   const router = useRouter();
@@ -34,21 +139,15 @@ export default function JobDetailScreen() {
   const [paymentMode, setPaymentMode] = useState<'cash' | 'upi' | 'online' | 'pending'>('cash');
   const [paymentUpdating, setPaymentUpdating] = useState(false);
 
-  useEffect(() => {
-    loadJob();
-  }, []);
+  useEffect(() => { loadJob(); }, []);
 
   const loadJob = async () => {
     try {
       if (!jobId) return;
       const response = await api.get(`/jobs/${jobId}`);
       setJob(response.data);
-      if (response.data?.staffRemark) {
-        setRemark(response.data.staffRemark);
-      }
-      if (response.data?.paymentMode) {
-        setPaymentMode(response.data.paymentMode);
-      }
+      if (response.data?.staffRemark) setRemark(response.data.staffRemark);
+      if (response.data?.paymentMode) setPaymentMode(response.data.paymentMode);
     } catch (error) {
       console.error('Error loading job:', error);
       Alert.alert('Error', 'Failed to load job details');
@@ -67,22 +166,27 @@ export default function JobDetailScreen() {
         latitude = loc.coords.latitude;
         longitude = loc.coords.longitude;
       }
-    } catch (e) {
-      console.warn('Location not available:', e);
-    }
+    } catch (e) { console.warn('Location not available:', e); }
     return { latitude, longitude };
   };
 
   const pickAndUploadPhoto = async (type: 'before' | 'after') => {
+    // Check photo limit
+    const existing = type === 'before'
+      ? (job?.photos?.before?.length || 0)
+      : (job?.photos?.after?.length || 0);
+    if (existing >= MAX_PHOTOS) {
+      Alert.alert('Limit reached', `Maximum ${MAX_PHOTOS} ${type} photos allowed`);
+      return;
+    }
+
     let result = await ImagePicker.launchCameraAsync({
       mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.3,
+      allowsEditing: false,
+      quality: 0.4,
     });
 
     if (result.canceled) return;
-
     setUploading(true);
     try {
       const timestamp = new Date().toISOString();
@@ -95,10 +199,10 @@ export default function JobDetailScreen() {
       );
 
       const formData = new FormData();
-      // @ts-ignore - RN FormData accepts { uri, name, type }
+      // @ts-ignore
       formData.append('photo', {
         uri: resized.uri,
-        name: `${type}-photo.jpg`,
+        name: `${type}-photo-${Date.now()}.jpg`,
         type: 'image/jpeg',
       });
       formData.append('timestamp', timestamp);
@@ -111,28 +215,36 @@ export default function JobDetailScreen() {
       const headers: Record<string, string> = {};
       if (token) headers.Authorization = `Bearer ${token}`;
 
-      const res = await fetch(uploadUrl, {
-        method: 'POST',
-        headers,
-        body: formData,
-      });
+      const res = await fetch(uploadUrl, { method: 'POST', headers, body: formData });
 
       if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(errText || `Upload failed: ${res.status}`);
+        const errBody = await res.json().catch(() => null);
+        throw new Error(errBody?.message || `Upload failed: ${res.status}`);
       }
 
-      const successMsg = type === 'before'
-        ? 'Before photo uploaded! Job started.'
-        : 'After photo uploaded!';
-      Alert.alert('Success', successMsg);
+      const remaining = MAX_PHOTOS - existing - 1;
+      const msg = type === 'before'
+        ? `Before photo uploaded! ${remaining > 0 ? `${remaining} more allowed.` : 'Limit reached.'}`
+        : `After photo uploaded! ${remaining > 0 ? `${remaining} more allowed.` : 'Limit reached.'}`;
+      Alert.alert('Done', msg);
       loadJob();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Upload error:', error);
-      Alert.alert('Error', `Failed to upload ${type} photo`);
+      Alert.alert('Error', error.message || `Failed to upload ${type} photo`);
     } finally {
       setUploading(false);
     }
+  };
+
+  const handleStartJob = async () => {
+    Alert.alert(
+      'Start Job',
+      'You are about to start this job. You will need to take at least 1 before photo of the tank/site.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Start & Take Photo', onPress: () => pickAndUploadPhoto('before') },
+      ]
+    );
   };
 
   const updateJobStatus = async (status: string) => {
@@ -141,7 +253,8 @@ export default function JobDetailScreen() {
       Alert.alert('Success', `Job marked as ${status}!`);
       loadJob();
     } catch (error: any) {
-      Alert.alert('Error', 'Failed to update job');
+      const msg = error.response?.data?.message || 'Failed to update job';
+      Alert.alert('Error', msg);
     }
   };
 
@@ -157,251 +270,321 @@ export default function JobDetailScreen() {
       Alert.alert('Done', 'Payment marked as PAID and remark saved');
       await loadJob();
     } catch (error: any) {
-      console.error('Payment update error', error.response?.data || error.message);
       Alert.alert('Error', 'Failed to update payment');
     } finally {
       setPaymentUpdating(false);
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending': return '#FF9500';
-      case 'in_progress': return '#34C759';
-      case 'completed': return '#007AFF';
-      default: return '#8E8E93';
+  const handleComplete = () => {
+    const afterCount = (job?.photos?.after?.length || 0);
+    if (afterCount === 0) {
+      Alert.alert('Photos required', 'Please upload at least 1 after photo before completing the job.');
+      return;
     }
+    Alert.alert(
+      'Complete Job',
+      'Are you sure the job is done and ready to mark as complete?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Complete', onPress: () => updateJobStatus('completed') },
+      ]
+    );
   };
 
-  // Helpers
-  const hasBefore = job?.photos?.before?.length > 0;
-  const hasAfter = job?.photos?.after?.length > 0 || job?.completionPhoto || job?.completion_photo;
+  // Derived state
+  const hasBefore = (job?.photos?.before?.length || 0) > 0;
+  const hasAfter = (job?.photos?.after?.length || 0) > 0;
+  const beforeCount = job?.photos?.before?.length || 0;
+  const afterCount = job?.photos?.after?.length || 0;
+  const isPaid = job?.paymentStatus === 'paid';
+
+  // Calculate current step: 0=Start, 1=Before photos, 2=Working, 3=After photos, 4=Complete
+  let currentStep = 0;
+  if (job) {
+    if (job.status === 'pending') {
+      currentStep = 0;
+    } else if (job.status === 'in_progress') {
+      if (!hasBefore) {
+        currentStep = 1;
+      } else if (!hasAfter) {
+        currentStep = 2;
+      } else {
+        currentStep = 3;
+      }
+    } else if (job.status === 'completed') {
+      currentStep = 4;
+    }
+  }
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color="#0EA5E9" />
       </View>
     );
   }
 
   if (!job) {
     return (
-      <View style={styles.container}>
-        <Text style={{ color: '#1a1a1a', fontSize: 16 }}>Job not found</Text>
-      </View>
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <Text style={{ color: '#1a1a1a', fontSize: 16, padding: 20 }}>Job not found</Text>
+      </SafeAreaView>
     );
   }
 
-  const rawAddress = String(job.address || '').trim();
-  const isPlaceholderAddress = rawAddress.toLowerCase().startsWith('address from lead');
-  const locationAddress = isPlaceholderAddress ? 'Location from coordinates / map pin' : rawAddress;
-
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={22} color="#007AFF" />
-          <Text style={styles.backText}>Back</Text>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <Ionicons name="arrow-back" size={22} color="#0f172a" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Job Details</Text>
-        <View style={{ width: 70 }} />
+        <View style={[styles.statusPill, { backgroundColor: job.status === 'completed' ? '#16a34a' : job.status === 'in_progress' ? '#f59e0b' : '#94a3b8' }]}>
+          <Text style={styles.statusPillText}>{job.status.replace('_', ' ').toUpperCase()}</Text>
+        </View>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Status */}
-        <View style={styles.section}>
-          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(job.status) }]}>
-            <Ionicons name={job.status === 'completed' ? 'checkmark-circle' : job.status === 'in_progress' ? 'time' : 'hourglass'} size={16} color="#fff" />
-            <Text style={styles.statusText}>{job.status.replace('_', ' ').toUpperCase()}</Text>
-          </View>
-        </View>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
 
-        {/* Customer Info */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Customer Information</Text>
-          <View style={styles.infoCard}>
-            <Text style={styles.customerName}>{job.customerName}</Text>
-            <Text style={styles.address}>{job.address}</Text>
+        {/* Step Progress */}
+        <StepIndicator currentStep={currentStep} />
 
-            <View style={styles.infoGrid}>
-              <View style={styles.infoItem}>
-                <Ionicons name="call-outline" size={14} color="#64748b" />
-                <Text style={styles.infoText}>{job.mobileNumber || 'N/A'}</Text>
-              </View>
-              <View style={styles.infoItem}>
-                <Ionicons name="water-outline" size={14} color="#64748b" />
-                <Text style={styles.infoText}>{job.tankSize || '?'} - {job.serviceType || 'N/A'}</Text>
-              </View>
-              <View style={styles.infoItem}>
-                <Ionicons name="cash-outline" size={14} color="#64748b" />
-                <Text style={styles.infoText}>
-                  {job.paymentStatus === 'paid' ? 'Paid' : 'Pending'} {(job.serviceCharge ?? 0) > 0 ? `- Rs.${Number(job.serviceCharge).toLocaleString('en-IN')}` : ''}
-                </Text>
-              </View>
-              <View style={styles.infoItem}>
-                <Ionicons name="trophy-outline" size={14} color="#16a34a" />
-                <Text style={[styles.infoText, { color: '#16a34a', fontWeight: '600' }]}>
-                  {job.status === 'completed' ? 'Incentive earned' : 'Incentive on completion'}: Rs.{(Number(job.incentivePerJob ?? 0) || 0).toLocaleString('en-IN')}
-                </Text>
-              </View>
-              {job.scheduledAt && (
-                <View style={styles.infoItem}>
-                  <Ionicons name="calendar-outline" size={14} color="#64748b" />
-                  <Text style={styles.infoText}>Scheduled: {new Date(job.scheduledAt).toLocaleString('en-IN')}</Text>
-                </View>
-              )}
+        {/* Customer Info Card */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>CUSTOMER DETAILS</Text>
+          <Text style={styles.customerName}>{job.customerName}</Text>
+          <Text style={styles.address}>{job.address}</Text>
+          <View style={styles.infoGrid}>
+            <View style={styles.infoItem}>
+              <Ionicons name="call-outline" size={14} color="#64748b" />
+              <Text style={styles.infoText}>{job.mobileNumber || 'N/A'}</Text>
             </View>
-          </View>
-        </View>
-
-        {/* Location */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Job Location</Text>
-          <View style={styles.infoCard}>
-            <Text style={styles.address}>{locationAddress}</Text>
-            {job.latitude != null && job.longitude != null && (
-              <Text style={{ fontSize: 13, color: '#666', marginTop: 6, fontFamily: FONT_REGULAR }}>
-                {Number(job.latitude).toFixed(5)}, {Number(job.longitude).toFixed(5)}
-              </Text>
+            <View style={styles.infoItem}>
+              <Ionicons name="water-outline" size={14} color="#64748b" />
+              <Text style={styles.infoText}>{job.tankSize || '?'} • {job.serviceType || 'N/A'}</Text>
+            </View>
+            {job.scheduledAt && (
+              <View style={styles.infoItem}>
+                <Ionicons name="calendar-outline" size={14} color="#64748b" />
+                <Text style={styles.infoText}>Scheduled: {new Date(job.scheduledAt).toLocaleDateString()}</Text>
+              </View>
             )}
-            <TouchableOpacity
-              style={styles.openMapsButton}
-              onPress={() => {
-                const lat = job.latitude ?? 0;
-                const lng = job.longitude ?? 0;
-                const url = Platform.select({
-                  ios: `maps://app?daddr=${lat},${lng}`,
-                  android: `geo:${lat},${lng}?q=${lat},${lng}`,
-                  default: `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`,
-                });
-                Linking.openURL(url!).catch(() => Linking.openURL(`https://www.google.com/maps?q=${lat},${lng}`));
-              }}
-            >
-              <Ionicons name="navigate-outline" size={16} color="#fff" />
-              <Text style={styles.openMapsButtonText}>Open in Maps</Text>
-            </TouchableOpacity>
           </View>
         </View>
 
-        {job.notes && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Special Instructions</Text>
-            <View style={styles.infoCard}>
-              <Text style={styles.notesText}>{job.notes}</Text>
+        {/* Earnings Card */}
+        <View style={[styles.card, { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }]}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <View>
+              <Text style={{ fontSize: 11, color: '#64748b', fontWeight: '600', letterSpacing: 0.5, fontFamily: FONT_MEDIUM }}>SERVICE CHARGE</Text>
+              <Text style={{ fontSize: 18, color: '#0f172a', fontWeight: '700', fontFamily: FONT_MEDIUM }}>
+                ₹{Number(job.serviceCharge || 0).toLocaleString('en-IN')}
+              </Text>
             </View>
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={{ fontSize: 11, color: '#64748b', fontWeight: '600', letterSpacing: 0.5, fontFamily: FONT_MEDIUM }}>YOUR INCENTIVE</Text>
+              <Text style={{ fontSize: 18, color: '#16a34a', fontWeight: '700', fontFamily: FONT_MEDIUM }}>
+                ₹{Number(job.incentivePerJob || 0).toLocaleString('en-IN')}
+              </Text>
+            </View>
+            <View style={[styles.paymentBadge, { backgroundColor: isPaid ? '#dcfce7' : '#fef3c7' }]}>
+              <Ionicons name={isPaid ? 'checkmark-circle' : 'time'} size={14} color={isPaid ? '#16a34a' : '#f59e0b'} />
+              <Text style={{ fontSize: 12, fontWeight: '700', color: isPaid ? '#16a34a' : '#f59e0b', fontFamily: FONT_MEDIUM }}>
+                {isPaid ? 'PAID' : 'PENDING'}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Location Card */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>JOB LOCATION</Text>
+          {job.latitude != null && job.longitude != null && (
+            <Text style={{ fontSize: 12, color: '#64748b', marginBottom: 8, fontFamily: FONT_REGULAR }}>
+              📍 {Number(job.latitude).toFixed(5)}, {Number(job.longitude).toFixed(5)}
+            </Text>
+          )}
+          <TouchableOpacity
+            style={styles.mapsBtn}
+            onPress={() => {
+              const lat = job.latitude ?? 0;
+              const lng = job.longitude ?? 0;
+              const url = Platform.select({
+                ios: `maps://app?daddr=${lat},${lng}`,
+                android: `geo:${lat},${lng}?q=${lat},${lng}`,
+                default: `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`,
+              });
+              Linking.openURL(url!).catch(() => Linking.openURL(`https://www.google.com/maps?q=${lat},${lng}`));
+            }}
+          >
+            <Ionicons name="navigate" size={16} color="#fff" />
+            <Text style={styles.mapsBtnText}>Navigate to Location</Text>
+          </TouchableOpacity>
+        </View>
+
+        {job.notes ? (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>SPECIAL INSTRUCTIONS</Text>
+            <Text style={{ fontSize: 14, color: '#475569', lineHeight: 20, fontFamily: FONT_REGULAR }}>{job.notes}</Text>
+          </View>
+        ) : null}
+
+        {/* ============================================================ */}
+        {/* STEP 1: START JOB (pending state) */}
+        {/* ============================================================ */}
+        {job.status === 'pending' && (
+          <View style={styles.actionCard}>
+            <View style={styles.actionCardHeader}>
+              <Ionicons name="play-circle" size={24} color="#0EA5E9" />
+              <Text style={styles.actionCardTitle}>Ready to Start?</Text>
+            </View>
+            <Text style={styles.actionCardDesc}>
+              Tap below to start this job. You'll need to take a photo of the tank/site before you begin work.
+            </Text>
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: '#0EA5E9' }]}
+              onPress={handleStartJob}
+              disabled={uploading}
+            >
+              {uploading ? <ActivityIndicator color="#fff" /> : (
+                <>
+                  <Ionicons name="camera" size={20} color="#fff" />
+                  <Text style={styles.actionBtnText}>Start Job & Take Before Photo</Text>
+                </>
+              )}
+            </TouchableOpacity>
           </View>
         )}
 
-        {/* Before/After Photos Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Job Photos</Text>
-          <View style={styles.photosCard}>
-            {/* Before Photos */}
-            <View style={styles.photoColumn}>
-              <View style={styles.photoLabel}>
-                <Ionicons name="camera-outline" size={16} color="#f59e0b" />
-                <Text style={styles.photoLabelText}>BEFORE</Text>
+        {/* ============================================================ */}
+        {/* STEP 2: BEFORE PHOTOS (in_progress, add more before photos) */}
+        {/* ============================================================ */}
+        {job.status === 'in_progress' && (
+          <View style={styles.card}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={styles.cardTitle}>BEFORE PHOTOS</Text>
+              <View style={styles.photoBadge}>
+                <Text style={styles.photoBadgeText}>{beforeCount}/{MAX_PHOTOS}</Text>
               </View>
-              {hasBefore ? (
-                <View style={styles.photoGrid}>
-                  {(job.photos?.before || []).map((p: string, idx: number) => {
-                    const uri = resolvePhotoUrl(p);
-                    return uri ? (
-                      <Image key={idx} source={{ uri }} style={styles.photoThumb} resizeMode="cover" />
-                    ) : (
-                      <View key={idx} style={[styles.photoThumb, styles.photoPlaceholder]}>
-                        <Text style={styles.photoPlaceholderText}>N/A</Text>
-                      </View>
-                    );
-                  })}
-                </View>
-              ) : (
-                <View style={[styles.photoThumb, styles.photoPlaceholder]}>
-                  <Ionicons name="image-outline" size={24} color="#cbd5e1" />
-                  <Text style={styles.photoPlaceholderText}>No photo yet</Text>
-                </View>
-              )}
             </View>
 
-            {/* Divider */}
-            <View style={styles.photoDivider} />
-
-            {/* After Photos */}
-            <View style={styles.photoColumn}>
-              <View style={styles.photoLabel}>
-                <Ionicons name="checkmark-circle-outline" size={16} color="#22c55e" />
-                <Text style={[styles.photoLabelText, { color: '#22c55e' }]}>AFTER</Text>
+            {/* Photo Grid */}
+            {hasBefore && (
+              <View style={styles.photoGrid}>
+                {(job.photos.before || []).map((p: string, idx: number) => {
+                  const uri = resolvePhotoUrl(p);
+                  return uri ? (
+                    <Image key={idx} source={{ uri }} style={styles.photoThumb} resizeMode="cover" />
+                  ) : (
+                    <View key={idx} style={[styles.photoThumb, styles.photoPlaceholder]}>
+                      <Ionicons name="image-outline" size={20} color="#cbd5e1" />
+                    </View>
+                  );
+                })}
               </View>
-              {hasAfter ? (
-                <View style={styles.photoGrid}>
-                  {(job.photos?.after || []).map((p: string, idx: number) => {
-                    const uri = resolvePhotoUrl(p);
-                    return uri ? (
-                      <Image key={idx} source={{ uri }} style={styles.photoThumb} resizeMode="cover" />
-                    ) : null;
-                  })}
-                  {/* legacy completionPhoto */}
-                  {!job.photos?.after?.length && (job.completionPhoto || job.completion_photo) && (
-                    <Image
-                      source={{ uri: resolvePhotoUrl(job.completionPhoto || job.completion_photo) || '' }}
-                      style={styles.photoThumb}
-                      resizeMode="cover"
-                    />
-                  )}
-                </View>
-              ) : (
-                <View style={[styles.photoThumb, styles.photoPlaceholder]}>
-                  <Ionicons name="image-outline" size={24} color="#cbd5e1" />
-                  <Text style={styles.photoPlaceholderText}>No photo yet</Text>
-                </View>
-              )}
-            </View>
+            )}
+
+            {beforeCount < MAX_PHOTOS && (
+              <TouchableOpacity
+                style={[styles.addPhotoBtn, { borderColor: '#f59e0b', backgroundColor: '#fffbeb' }]}
+                onPress={() => pickAndUploadPhoto('before')}
+                disabled={uploading}
+              >
+                {uploading ? <ActivityIndicator color="#f59e0b" /> : (
+                  <>
+                    <Ionicons name="camera-outline" size={18} color="#f59e0b" />
+                    <Text style={[styles.addPhotoBtnText, { color: '#f59e0b' }]}>Add Before Photo ({MAX_PHOTOS - beforeCount} remaining)</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
+
+            {job.beforePhotoAt && (
+              <Text style={styles.metaText}>Started: {new Date(job.beforePhotoAt).toLocaleString()}</Text>
+            )}
           </View>
+        )}
 
-          {/* Completion metadata */}
-          {(job.completionPhotoAt || job.beforePhotoAt) && (
-            <View style={{ marginTop: 8 }}>
-              {job.beforePhotoAt && (
-                <Text style={styles.metaText}>
-                  Before: {new Date(job.beforePhotoAt).toLocaleString('en-IN')}
-                </Text>
-              )}
-              {job.completionPhotoAt && (
-                <Text style={styles.metaText}>
-                  After: {new Date(job.completionPhotoAt).toLocaleString('en-IN')}
-                </Text>
-              )}
+        {/* ============================================================ */}
+        {/* STEP 3: AFTER PHOTOS (in_progress, work done, upload after) */}
+        {/* ============================================================ */}
+        {job.status === 'in_progress' && (
+          <View style={styles.card}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={styles.cardTitle}>AFTER PHOTOS</Text>
+              <View style={[styles.photoBadge, { backgroundColor: '#dcfce7' }]}>
+                <Text style={[styles.photoBadgeText, { color: '#16a34a' }]}>{afterCount}/{MAX_PHOTOS}</Text>
+              </View>
             </View>
-          )}
-        </View>
 
-        {/* Payment & Remark */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Payment & Remark</Text>
-          <View style={styles.infoCard}>
-            <Text style={styles.fieldLabel}>Payment mode</Text>
+            {hasAfter && (
+              <View style={styles.photoGrid}>
+                {(job.photos?.after || []).map((p: string, idx: number) => {
+                  const uri = resolvePhotoUrl(p);
+                  return uri ? (
+                    <Image key={idx} source={{ uri }} style={styles.photoThumb} resizeMode="cover" />
+                  ) : null;
+                })}
+              </View>
+            )}
+
+            {!hasBefore ? (
+              <View style={styles.lockedBox}>
+                <Ionicons name="lock-closed" size={18} color="#94a3b8" />
+                <Text style={styles.lockedText}>Upload at least 1 before photo first</Text>
+              </View>
+            ) : afterCount < MAX_PHOTOS ? (
+              <TouchableOpacity
+                style={[styles.addPhotoBtn, { borderColor: '#22c55e', backgroundColor: '#f0fdf4' }]}
+                onPress={() => pickAndUploadPhoto('after')}
+                disabled={uploading}
+              >
+                {uploading ? <ActivityIndicator color="#22c55e" /> : (
+                  <>
+                    <Ionicons name="camera-outline" size={18} color="#22c55e" />
+                    <Text style={[styles.addPhotoBtnText, { color: '#22c55e' }]}>
+                      {afterCount === 0 ? 'Take After Photo (work done?)' : `Add After Photo (${MAX_PHOTOS - afterCount} remaining)`}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            ) : null}
+
+            {job.completionPhotoAt && (
+              <Text style={styles.metaText}>Last uploaded: {new Date(job.completionPhotoAt).toLocaleString()}</Text>
+            )}
+          </View>
+        )}
+
+        {/* ============================================================ */}
+        {/* STEP 4: PAYMENT & REMARK (in_progress) */}
+        {/* ============================================================ */}
+        {job.status === 'in_progress' && (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>PAYMENT & REMARK</Text>
+
+            <Text style={styles.fieldLabel}>Payment Mode</Text>
             <View style={styles.paymentModesRow}>
-              {['cash', 'upi', 'online', 'pending'].map((mode) => {
+              {(['cash', 'upi', 'online', 'pending'] as const).map((mode) => {
                 const active = paymentMode === mode;
                 return (
                   <TouchableOpacity
                     key={mode}
                     style={[styles.paymentChip, active && styles.paymentChipActive]}
-                    onPress={() => setPaymentMode(mode as any)}
+                    onPress={() => setPaymentMode(mode)}
                   >
-                    <View style={styles.paymentChipInner}>
-                      {active && <Ionicons name="checkmark-circle" size={16} color="#16a34a" style={{ marginRight: 4 }} />}
-                      <Text style={[styles.paymentChipText, active && styles.paymentChipTextActive]}>
-                        {mode.toUpperCase()}
-                      </Text>
-                    </View>
+                    {active && <Ionicons name="checkmark-circle" size={14} color="#16a34a" style={{ marginRight: 4 }} />}
+                    <Text style={[styles.paymentChipText, active && styles.paymentChipTextActive]}>
+                      {mode.toUpperCase()}
+                    </Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
 
-            <Text style={[styles.fieldLabel, { marginTop: 12 }]}>Customer remark</Text>
+            <Text style={[styles.fieldLabel, { marginTop: 12 }]}>Customer Remark</Text>
             <TextInput
               style={styles.remarkInput}
               placeholder="Any notes about the job..."
@@ -412,116 +595,125 @@ export default function JobDetailScreen() {
               onChangeText={setRemark}
             />
 
-            {job.paymentStatus !== 'paid' && (
+            {!isPaid && (
               <TouchableOpacity
-                style={styles.paymentButton}
+                style={styles.payBtn}
                 onPress={updatePaymentAndRemark}
                 disabled={paymentUpdating}
               >
-                {paymentUpdating ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.paymentButtonText}>Mark as PAID + Save remark</Text>
+                {paymentUpdating ? <ActivityIndicator color="#fff" /> : (
+                  <>
+                    <Ionicons name="cash" size={18} color="#fff" />
+                    <Text style={styles.payBtnText}>Mark as PAID & Save Remark</Text>
+                  </>
                 )}
               </TouchableOpacity>
             )}
           </View>
-        </View>
+        )}
 
-        <View style={{ height: 120 }} />
+        {/* ============================================================ */}
+        {/* STEP 5: COMPLETE JOB BUTTON (in_progress + has after photos) */}
+        {/* ============================================================ */}
+        {job.status === 'in_progress' && hasAfter && (
+          <View style={styles.actionCard}>
+            <View style={styles.actionCardHeader}>
+              <Ionicons name="checkmark-done-circle" size={24} color="#16a34a" />
+              <Text style={[styles.actionCardTitle, { color: '#16a34a' }]}>Ready to Complete?</Text>
+            </View>
+            <Text style={styles.actionCardDesc}>
+              Before: {beforeCount} photo{beforeCount !== 1 ? 's' : ''} • After: {afterCount} photo{afterCount !== 1 ? 's' : ''} • Payment: {isPaid ? 'Received ✓' : 'Pending'}
+            </Text>
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: '#16a34a' }]}
+              onPress={handleComplete}
+            >
+              <Ionicons name="checkmark-done" size={20} color="#fff" />
+              <Text style={styles.actionBtnText}>Mark as Complete</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* ============================================================ */}
+        {/* COMPLETED STATE - Summary */}
+        {/* ============================================================ */}
+        {job.status === 'completed' && (
+          <>
+            <View style={[styles.card, { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <Ionicons name="checkmark-circle" size={24} color="#16a34a" />
+                <Text style={{ fontSize: 16, fontWeight: '700', color: '#16a34a', fontFamily: FONT_MEDIUM }}>Job Completed</Text>
+              </View>
+              {job.timeline?.completedAt && (
+                <Text style={styles.metaText}>Completed: {new Date(job.timeline.completedAt).toLocaleString()}</Text>
+              )}
+              {job.timeline?.startedAt && (
+                <Text style={styles.metaText}>Started: {new Date(job.timeline.startedAt).toLocaleString()}</Text>
+              )}
+            </View>
+
+            {/* Show all photos */}
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>BEFORE PHOTOS ({beforeCount})</Text>
+              {hasBefore && (
+                <View style={styles.photoGrid}>
+                  {(job.photos.before || []).map((p: string, idx: number) => {
+                    const uri = resolvePhotoUrl(p);
+                    return uri ? <Image key={idx} source={{ uri }} style={styles.photoThumb} resizeMode="cover" /> : null;
+                  })}
+                </View>
+              )}
+            </View>
+
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>AFTER PHOTOS ({afterCount})</Text>
+              {hasAfter && (
+                <View style={styles.photoGrid}>
+                  {(job.photos?.after || []).map((p: string, idx: number) => {
+                    const uri = resolvePhotoUrl(p);
+                    return uri ? <Image key={idx} source={{ uri }} style={styles.photoThumb} resizeMode="cover" /> : null;
+                  })}
+                </View>
+              )}
+            </View>
+          </>
+        )}
+
       </ScrollView>
-
-      {/* Action Area */}
-      {job.status === 'pending' && (
-        <View style={styles.bottomActions}>
-          <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: '#f59e0b' }]}
-            onPress={() => pickAndUploadPhoto('before')}
-            disabled={uploading}
-          >
-            {uploading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <>
-                <Ionicons name="camera" size={20} color="#fff" />
-                <Text style={styles.actionButtonText}>Take Before Photo & Start Job</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {job.status === 'in_progress' && !hasAfter && (
-        <View style={styles.bottomActions}>
-          <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: '#22c55e' }]}
-            onPress={() => pickAndUploadPhoto('after')}
-            disabled={uploading}
-          >
-            {uploading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <>
-                <Ionicons name="camera" size={20} color="#fff" />
-                <Text style={styles.actionButtonText}>Take After Photo</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {job.status === 'in_progress' && hasAfter && (
-        <View style={styles.bottomActions}>
-          <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: '#007AFF' }]}
-            onPress={() => updateJobStatus('completed')}
-          >
-            <Ionicons name="checkmark-done" size={20} color="#fff" />
-            <Text style={styles.actionButtonText}>Mark as Complete</Text>
-          </TouchableOpacity>
-        </View>
-      )}
     </SafeAreaView>
   );
 }
 
+/* ------------------------------------------------------------------ */
+/*  Styles                                                              */
+/* ------------------------------------------------------------------ */
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  container: { flex: 1, backgroundColor: '#f0f4f8' },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+
+  // Header
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#fff',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#fff',
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#e2e8f0',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
-    shadowRadius: 2,
+    shadowRadius: 3,
     elevation: 2,
   },
-  backButton: {
-    flexDirection: 'row',
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f1f5f9',
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 4,
-    width: 70,
-    paddingVertical: 4,
-  },
-  backText: {
-    fontSize: 15,
-    color: '#007AFF',
-    fontWeight: '500',
-    fontFamily: FONT_MEDIUM,
   },
   headerTitle: {
     fontSize: 17,
@@ -529,48 +721,40 @@ const styles = StyleSheet.create({
     color: '#0f172a',
     fontFamily: FONT_MEDIUM,
   },
-  content: {
-    flex: 1,
+  statusPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
   },
-  section: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-  },
-  sectionTitle: {
-    fontSize: 14,
+  statusPillText: {
+    fontSize: 10,
     fontWeight: '700',
-    color: '#475569',
-    marginBottom: 10,
-    textTransform: 'uppercase',
+    color: '#fff',
     letterSpacing: 0.5,
     fontFamily: FONT_MEDIUM,
   },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    alignSelf: 'flex-start',
-  },
-  statusText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '700',
-    fontFamily: FONT_MEDIUM,
-  },
-  infoCard: {
+
+  // Cards
+  card: {
     backgroundColor: '#fff',
     borderRadius: 14,
     padding: 16,
+    marginBottom: 12,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#e2e8f0',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
     elevation: 2,
+  },
+  cardTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#94a3b8',
+    letterSpacing: 0.5,
+    marginBottom: 10,
+    fontFamily: FONT_MEDIUM,
   },
   customerName: {
     fontSize: 18,
@@ -586,11 +770,11 @@ const styles = StyleSheet.create({
     fontFamily: FONT_REGULAR,
   },
   infoGrid: {
-    marginTop: 12,
-    paddingTop: 12,
+    marginTop: 10,
+    paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: '#f1f5f9',
-    gap: 8,
+    gap: 6,
   },
   infoItem: {
     flexDirection: 'row',
@@ -602,28 +786,172 @@ const styles = StyleSheet.create({
     color: '#475569',
     fontFamily: FONT_REGULAR,
   },
-  notesText: {
+
+  // Payment badge
+  paymentBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+
+  // Maps button
+  mapsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#0EA5E9',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    alignSelf: 'stretch',
+    justifyContent: 'center',
+  },
+  mapsBtnText: {
+    color: '#fff',
     fontSize: 14,
-    color: '#475569',
-    lineHeight: 20,
+    fontWeight: '600',
+    fontFamily: FONT_MEDIUM,
+  },
+
+  // Photo section
+  photoBadge: {
+    backgroundColor: '#fef3c7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  photoBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#f59e0b',
+    fontFamily: FONT_MEDIUM,
+  },
+  photoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 10,
+  },
+  photoThumb: {
+    width: 90,
+    height: 70,
+    borderRadius: 10,
+    backgroundColor: '#f1f5f9',
+  },
+  photoPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderStyle: 'dashed',
+  },
+  addPhotoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    paddingVertical: 14,
+    marginBottom: 8,
+  },
+  addPhotoBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    fontFamily: FONT_MEDIUM,
+  },
+  lockedBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#f1f5f9',
+    borderRadius: 12,
+    paddingVertical: 16,
+    marginBottom: 8,
+  },
+  lockedText: {
+    fontSize: 13,
+    color: '#94a3b8',
     fontFamily: FONT_REGULAR,
   },
+  metaText: {
+    fontSize: 11,
+    color: '#64748b',
+    marginTop: 4,
+    fontFamily: FONT_REGULAR,
+  },
+
+  // Action Card
+  actionCard: {
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 20,
+    marginBottom: 12,
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  actionCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 8,
+  },
+  actionCardTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#0EA5E9',
+    fontFamily: FONT_MEDIUM,
+  },
+  actionCardDesc: {
+    fontSize: 13,
+    color: '#64748b',
+    lineHeight: 20,
+    marginBottom: 14,
+    fontFamily: FONT_REGULAR,
+  },
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 16,
+    borderRadius: 14,
+  },
+  actionBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+    fontFamily: FONT_MEDIUM,
+  },
+
+  // Payment section
   fieldLabel: {
     fontSize: 13,
     fontWeight: '600',
     color: '#334155',
-    marginBottom: 4,
+    marginBottom: 6,
     fontFamily: FONT_MEDIUM,
   },
   paymentModesRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginTop: 4,
   },
   paymentChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingVertical: 8,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: '#cbd5e1',
@@ -632,10 +960,6 @@ const styles = StyleSheet.create({
   paymentChipActive: {
     borderColor: '#22c55e',
     backgroundColor: '#dcfce7',
-  },
-  paymentChipInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
   },
   paymentChipText: {
     fontSize: 12,
@@ -655,132 +979,21 @@ const styles = StyleSheet.create({
     color: '#0f172a',
     minHeight: 70,
     textAlignVertical: 'top',
-    marginTop: 4,
     fontFamily: FONT_REGULAR,
   },
-  paymentButton: {
-    marginTop: 14,
-    backgroundColor: '#16a34a',
-    borderRadius: 12,
-    paddingVertical: 13,
-    alignItems: 'center',
-  },
-  paymentButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '700',
-    fontFamily: FONT_MEDIUM,
-  },
-  openMapsButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    backgroundColor: '#0EA5E9',
-    borderRadius: 10,
-    alignSelf: 'flex-start',
-  },
-  openMapsButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-    fontFamily: FONT_MEDIUM,
-  },
-  // Photos section
-  photosCard: {
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    padding: 16,
-    flexDirection: 'row',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#e2e8f0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  photoColumn: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  photoDivider: {
-    width: 1,
-    backgroundColor: '#e2e8f0',
-    marginHorizontal: 12,
-  },
-  photoLabel: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginBottom: 10,
-  },
-  photoLabelText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#f59e0b',
-    fontFamily: FONT_MEDIUM,
-  },
-  photoGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    justifyContent: 'center',
-  },
-  photoThumb: {
-    width: 120,
-    height: 90,
-    borderRadius: 10,
-    backgroundColor: '#f1f5f9',
-  },
-  photoPlaceholder: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderStyle: 'dashed',
-  },
-  photoPlaceholderText: {
-    fontSize: 11,
-    color: '#94a3b8',
-    marginTop: 4,
-    fontFamily: FONT_REGULAR,
-  },
-  metaText: {
-    fontSize: 12,
-    color: '#64748b',
-    fontFamily: FONT_REGULAR,
-  },
-  // Bottom actions
-  bottomActions: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 16,
-    paddingBottom: 24,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  actionButton: {
+  payBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: 16,
-    borderRadius: 14,
+    marginTop: 12,
+    backgroundColor: '#16a34a',
+    borderRadius: 12,
+    paddingVertical: 14,
   },
-  actionButtonText: {
+  payBtnText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
     fontFamily: FONT_MEDIUM,
   },

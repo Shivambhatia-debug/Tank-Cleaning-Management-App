@@ -836,6 +836,14 @@ app.put('/api/jobs/:id', auth, async (req, res) => {
 
         if (status === 'in_progress') updates['timeline.startedAt'] = new Date();
         if (status === 'completed') {
+            // Require at least 1 after photo before completing
+            const existingJob = await Job.findById(req.params.id);
+            if (existingJob) {
+                const afterCount = (existingJob.photos?.after?.length || 0) + (existingJob.completionPhoto ? 1 : 0);
+                if (afterCount === 0) {
+                    return res.status(400).json({ message: 'Please upload at least 1 after photo before marking job as complete' });
+                }
+            }
             const now = new Date();
             updates['timeline.completedAt'] = now;
             // Auto: repeat cleaning reminder after 6 months
@@ -872,6 +880,14 @@ app.delete('/api/jobs/:id', auth, async (req, res) => {
 app.post('/api/jobs/:id/upload', auth, upload.single('photo'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
+
+        // Enforce 10-photo limit for after photos
+        const existingJob = await Job.findById(req.params.id);
+        if (!existingJob) return res.status(404).json({ message: 'Job not found' });
+        if (existingJob.photos && existingJob.photos.after && existingJob.photos.after.length >= 10) {
+            return res.status(400).json({ message: 'Maximum 10 after photos allowed' });
+        }
+
         const timestamp = req.body.timestamp ? new Date(req.body.timestamp) : new Date();
         const lat = req.body.latitude != null ? parseFloat(req.body.latitude) : null;
         const lng = req.body.longitude != null ? parseFloat(req.body.longitude) : null;
@@ -910,6 +926,14 @@ app.post('/api/jobs/:id/upload', auth, upload.single('photo'), async (req, res) 
 app.post('/api/jobs/:id/upload-before', auth, upload.single('photo'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
+
+        // Enforce 10-photo limit for before photos
+        const existingJob = await Job.findById(req.params.id);
+        if (!existingJob) return res.status(404).json({ message: 'Job not found' });
+        if (existingJob.photos && existingJob.photos.before && existingJob.photos.before.length >= 10) {
+            return res.status(400).json({ message: 'Maximum 10 before photos allowed' });
+        }
+
         const timestamp = req.body.timestamp ? new Date(req.body.timestamp) : new Date();
         const lat = req.body.latitude != null ? parseFloat(req.body.latitude) : null;
         const lng = req.body.longitude != null ? parseFloat(req.body.longitude) : null;

@@ -167,10 +167,34 @@ export default function AdminJobDetailScreen() {
   const hasBefore = job.photos?.before?.length > 0;
   const hasAfter =
     job.photos?.after?.length > 0 || !!job.completionPhoto || !!job.completion_photo;
+  const beforeCount = job.photos?.before?.length || 0;
+  const afterCount = job.photos?.after?.length || 0;
   const charge = Number(job.serviceCharge ?? job.service_charge ?? 0);
   const incentive = Number(job.incentivePerJob ?? job.incentive_per_job ?? 0);
   const paymentStatus = job.paymentStatus === 'paid' ? 'Paid' : 'Pending';
   const paymentMode = (job.paymentMode || job.payment_mode || '—').toUpperCase();
+
+  // Progress tracking
+  let progressStep = 'Pending';
+  let progressColor = '#94a3b8';
+  if (job.status === 'pending') {
+    progressStep = 'Waiting for staff to start';
+    progressColor = '#f59e0b';
+  } else if (job.status === 'in_progress') {
+    if (!hasBefore) {
+      progressStep = 'Started — waiting for before photos';
+      progressColor = '#f59e0b';
+    } else if (!hasAfter) {
+      progressStep = `Work in progress (${beforeCount} before photo${beforeCount !== 1 ? 's' : ''})`;
+      progressColor = '#0EA5E9';
+    } else {
+      progressStep = `Work done — ${afterCount} after photo${afterCount !== 1 ? 's' : ''} uploaded`;
+      progressColor = '#16a34a';
+    }
+  } else if (job.status === 'completed') {
+    progressStep = 'Completed';
+    progressColor = '#16a34a';
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -203,6 +227,38 @@ export default function AdminJobDetailScreen() {
               {(job.status || '').replace('_', ' ').toUpperCase()}
             </Text>
           </View>
+        </View>
+
+        {/* -------- Progress Tracker -------- */}
+        <View style={styles.card}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.sectionTitle, { marginBottom: 4, fontSize: 11, letterSpacing: 0.5 }]}>STAFF PROGRESS</Text>
+              <Text style={{ fontSize: 14, fontWeight: '600', color: progressColor, fontFamily: FONT_MEDIUM }}>
+                {progressStep}
+              </Text>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <View style={{ alignItems: 'center', backgroundColor: '#fffbeb', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: '#fde68a' }}>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: '#f59e0b', fontFamily: FONT_MEDIUM }}>{beforeCount}</Text>
+                <Text style={{ fontSize: 9, color: '#92400e', fontWeight: '600' }}>BEFORE</Text>
+              </View>
+              <View style={{ alignItems: 'center', backgroundColor: '#f0fdf4', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: '#bbf7d0' }}>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: '#16a34a', fontFamily: FONT_MEDIUM }}>{afterCount}</Text>
+                <Text style={{ fontSize: 9, color: '#166534', fontWeight: '600' }}>AFTER</Text>
+              </View>
+            </View>
+          </View>
+          {job.timeline?.startedAt && (
+            <Text style={{ fontSize: 11, color: '#64748b', marginTop: 8, fontFamily: FONT_REGULAR }}>
+              Started: {new Date(job.timeline.startedAt).toLocaleString()}
+            </Text>
+          )}
+          {job.timeline?.completedAt && (
+            <Text style={{ fontSize: 11, color: '#16a34a', marginTop: 2, fontFamily: FONT_REGULAR }}>
+              Completed: {new Date(job.timeline.completedAt).toLocaleString()}
+            </Text>
+          )}
         </View>
 
         {/* -------- Customer Info -------- */}
@@ -243,66 +299,52 @@ export default function AdminJobDetailScreen() {
           />
         </View>
 
-        {/* -------- Photos -------- */}
-        {(hasBefore || hasAfter) && (
-          <>
-            <SectionTitle title="Photos" />
-            <View style={styles.card}>
-              <View style={styles.photosRow}>
-                {/* Before column */}
-                <View style={styles.photoColumn}>
-                  <View style={styles.photoLabelRow}>
-                    <Ionicons name="camera-outline" size={15} color="#f59e0b" />
-                    <Text style={[styles.photoLabelText, { color: '#f59e0b' }]}>BEFORE</Text>
-                  </View>
-                  {hasBefore ? (
-                    (job.photos.before as string[]).slice(0, 3).map((p: string, i: number) => (
-                      <PhotoThumb key={`b-${i}`} uri={resolvePhotoUrl(p)} />
-                    ))
-                  ) : (
-                    <PhotoThumb uri={null} />
-                  )}
-                </View>
+        {/* -------- Before Photos -------- */}
+        <SectionTitle title={`Before Photos (${beforeCount})`} />
+        <View style={styles.card}>
+          {hasBefore ? (
+            <View style={styles.photoGridWrap}>
+              {(job.photos.before as string[]).map((p: string, i: number) => (
+                <PhotoThumb key={`b-${i}`} uri={resolvePhotoUrl(p)} />
+              ))}
+            </View>
+          ) : (
+            <View style={{ alignItems: 'center', paddingVertical: 16 }}>
+              <Ionicons name="camera-outline" size={32} color="#e2e8f0" />
+              <Text style={{ fontSize: 12, color: '#94a3b8', marginTop: 4, fontFamily: FONT_REGULAR }}>No before photos yet</Text>
+            </View>
+          )}
+          {job.beforePhotoAt && (
+            <Text style={styles.photoMetaText}>
+              First photo: {new Date(job.beforePhotoAt).toLocaleString('en-IN')}
+            </Text>
+          )}
+        </View>
 
-                {/* Divider */}
-                <View style={styles.photoDivider} />
-
-                {/* After column */}
-                <View style={styles.photoColumn}>
-                  <View style={styles.photoLabelRow}>
-                    <Ionicons name="checkmark-circle-outline" size={15} color="#22c55e" />
-                    <Text style={[styles.photoLabelText, { color: '#22c55e' }]}>AFTER</Text>
-                  </View>
-                  {job.photos?.after?.length > 0 ? (
-                    (job.photos.after as string[]).slice(0, 3).map((p: string, i: number) => (
-                      <PhotoThumb key={`a-${i}`} uri={resolvePhotoUrl(p)} />
-                    ))
-                  ) : job.completionPhoto || job.completion_photo ? (
-                    <PhotoThumb uri={resolvePhotoUrl(job.completionPhoto || job.completion_photo)} />
-                  ) : (
-                    <PhotoThumb uri={null} />
-                  )}
-                </View>
-              </View>
-
-              {/* Timestamp metadata */}
-              {(job.beforePhotoAt || job.completionPhotoAt) && (
-                <View style={styles.photoMeta}>
-                  {job.beforePhotoAt && (
-                    <Text style={styles.photoMetaText}>
-                      Before: {new Date(job.beforePhotoAt).toLocaleString('en-IN')}
-                    </Text>
-                  )}
-                  {job.completionPhotoAt && (
-                    <Text style={styles.photoMetaText}>
-                      After: {new Date(job.completionPhotoAt).toLocaleString('en-IN')}
-                    </Text>
-                  )}
-                </View>
+        {/* -------- After Photos -------- */}
+        <SectionTitle title={`After Photos (${afterCount})`} />
+        <View style={styles.card}>
+          {hasAfter ? (
+            <View style={styles.photoGridWrap}>
+              {(job.photos?.after || []).map((p: string, i: number) => (
+                <PhotoThumb key={`a-${i}`} uri={resolvePhotoUrl(p)} />
+              ))}
+              {!job.photos?.after?.length && (job.completionPhoto || job.completion_photo) && (
+                <PhotoThumb uri={resolvePhotoUrl(job.completionPhoto || job.completion_photo)} />
               )}
             </View>
-          </>
-        )}
+          ) : (
+            <View style={{ alignItems: 'center', paddingVertical: 16 }}>
+              <Ionicons name="camera-reverse-outline" size={32} color="#e2e8f0" />
+              <Text style={{ fontSize: 12, color: '#94a3b8', marginTop: 4, fontFamily: FONT_REGULAR }}>No after photos yet</Text>
+            </View>
+          )}
+          {job.completionPhotoAt && (
+            <Text style={styles.photoMetaText}>
+              Last photo: {new Date(job.completionPhotoAt).toLocaleString('en-IN')}
+            </Text>
+          )}
+        </View>
 
         {/* -------- Assigned Staff -------- */}
         <SectionTitle title="Assigned Staff" />
@@ -594,6 +636,14 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#8E8E93',
     fontFamily: FONT_REGULAR,
+  },
+
+  /* Photo grid (new) */
+  photoGridWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 8,
   },
 
   /* Delete button */
