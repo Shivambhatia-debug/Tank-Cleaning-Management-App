@@ -228,7 +228,8 @@ export default function LeadsScreen() {
         finalPrice: '',
         bookingDate: '',
         timeSlot: '',
-        paymentStatus: 'pending',
+        jobStatus: 'New Lead',
+        paymentStatus: 'Pending',
         paymentMode: 'pending',
         notes: '',
         source: 'Direct Call',
@@ -484,7 +485,29 @@ export default function LeadsScreen() {
       payload.targetLatitude = lat;
       payload.targetLongitude = lng;
       await api.post('/jobs', payload);
-      Alert.alert('Done', 'Job created from this lead. Go to Jobs tab to assign staff & schedule.');
+
+      // Auto-update lead: move to Follow-up, set job status to In Progress, schedule 6-month follow-up
+      const sixMonthsLater = new Date();
+      sixMonthsLater.setMonth(sixMonthsLater.getMonth() + 6);
+      try {
+        await api.put(`/leads/${selectedLead._id}`, {
+          status: 'Follow-up',
+          jobStatus: 'In Progress',
+          nextFollowUpAt: sixMonthsLater.toISOString(),
+        });
+        // Also add a discussion log about the conversion
+        await api.post(`/leads/${selectedLead._id}/logs`, {
+          notes: `Lead converted to job. Staff assigned. Next service follow-up in 6 months.`,
+          nextFollowUpAt: sixMonthsLater.toISOString(),
+        });
+      } catch (updateErr) {
+        console.warn('Could not auto-update lead status after conversion', updateErr);
+      }
+
+      setDetailModalVisible(false);
+      setSelectedLead(null);
+      loadLeads();
+      Alert.alert('Done', 'Job created! Lead moved to Follow-up with 6-month reminder.');
     } catch (err: any) {
       console.error('Create job from lead error', err.response?.data || err.message);
       Alert.alert('Error', err.response?.data?.message || 'Failed to create job from lead');
@@ -895,13 +918,14 @@ export default function LeadsScreen() {
               contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
               showsVerticalScrollIndicator={false}
             >
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <Text style={styles.modalTitle}>{selectedLead.customerName}</Text>
+                <View style={styles.detailHeaderRow}>
+                  <Text style={styles.detailHeaderName} numberOfLines={1}>{selectedLead.customerName}</Text>
                   <TouchableOpacity
-                    style={[styles.modalBtn, editLeadMode ? styles.convertBtn : { backgroundColor: '#64748b', paddingHorizontal: 12 }]}
+                    style={[styles.editLeadBtn, editLeadMode && styles.editLeadBtnActive]}
                     onPress={() => setEditLeadMode(!editLeadMode)}
                   >
-                    <Text style={styles.modalBtnPrimaryText}>{editLeadMode ? 'Cancel edit' : 'Edit lead'}</Text>
+                    <Ionicons name={editLeadMode ? 'close' : 'create-outline'} size={16} color={editLeadMode ? '#fff' : '#64748b'} />
+                    <Text style={[styles.editLeadBtnText, editLeadMode && { color: '#fff' }]}>{editLeadMode ? 'Cancel' : 'Edit'}</Text>
                   </TouchableOpacity>
                 </View>
 
@@ -1005,103 +1029,90 @@ export default function LeadsScreen() {
                   )}
                 </View>
 
-                <View style={styles.statusPillsRow}>
-                  {JOB_STATUS_OPTIONS.map((st) => {
-                    const active = detailJobStatus === st;
-                    return (
-                      <TouchableOpacity
-                        key={st}
-                        style={[
-                          styles.statusPill,
-                          active && styles.statusPillActive,
-                        ]}
-                        onPress={() => setDetailJobStatus(st)}
-                      >
-                        <Text
-                          style={[
-                            styles.statusPillText,
-                            active && styles.statusPillTextActive,
-                          ]}
+                {/* Update Status Card */}
+                <View style={styles.detailCard}>
+                  <Text style={styles.detailCardTitle}>UPDATE STATUS</Text>
+                  <Text style={[styles.labelSmall, { marginBottom: 6 }]}>Job Status</Text>
+                  <View style={styles.statusPillsRow}>
+                    {JOB_STATUS_OPTIONS.map((st) => {
+                      const active = detailJobStatus === st;
+                      return (
+                        <TouchableOpacity
+                          key={st}
+                          style={[styles.statusPill, active && styles.statusPillActive]}
+                          onPress={() => setDetailJobStatus(st)}
                         >
-                          {st}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-                <View style={styles.statusPillsRow}>
-                  {PAYMENT_STATUS_OPTIONS.map((st) => {
-                    const active = detailPaymentStatus === st;
-                    return (
-                      <TouchableOpacity
-                        key={st}
-                        style={[
-                          styles.statusPill,
-                          active && styles.statusPillActive,
-                        ]}
-                        onPress={() => setDetailPaymentStatus(st)}
-                      >
-                        <Text
-                          style={[
-                            styles.statusPillText,
-                            active && styles.statusPillTextActive,
-                          ]}
+                          <Text style={[styles.statusPillText, active && styles.statusPillTextActive]}>{st}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                  <Text style={[styles.labelSmall, { marginTop: 10, marginBottom: 6 }]}>Payment Status</Text>
+                  <View style={styles.statusPillsRow}>
+                    {PAYMENT_STATUS_OPTIONS.map((st) => {
+                      const active = detailPaymentStatus === st;
+                      return (
+                        <TouchableOpacity
+                          key={st}
+                          style={[styles.statusPill, active && styles.statusPillActive]}
+                          onPress={() => setDetailPaymentStatus(st)}
                         >
-                          {st}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-                <TouchableOpacity
-                  style={[styles.modalBtn, styles.modalBtnPrimary, { marginTop: 4 }]}
-                  onPress={handleUpdateLeadStatus}
-                >
-                  <Text style={styles.modalBtnPrimaryText}>Update status</Text>
-                </TouchableOpacity>
-
-                {/* Location (lat/long) for map / convert to job */}
-                <View style={styles.addLogSection}>
-                  <Text style={styles.labelSmall}>📍 Location (job ke liye map coords)</Text>
-                  <Text style={styles.labelSmall}>Latitude</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="e.g. 26.1775"
-                    placeholderTextColor="#9CA3AF"
-                    keyboardType="numeric"
-                    value={detailLat}
-                    onChangeText={setDetailLat}
-                  />
-                  <Text style={styles.labelSmall}>Longitude</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="e.g. 85.8714"
-                    placeholderTextColor="#9CA3AF"
-                    keyboardType="numeric"
-                    value={detailLng}
-                    onChangeText={setDetailLng}
-                  />
+                          <Text style={[styles.statusPillText, active && styles.statusPillTextActive]}>{st}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
                   <TouchableOpacity
-                    style={[styles.modalBtn, styles.modalBtnPrimary]}
+                    style={[styles.modalBtn, styles.modalBtnPrimary, { marginTop: 10 }]}
+                    onPress={handleUpdateLeadStatus}
+                  >
+                    <Text style={styles.modalBtnPrimaryText}>Update status</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Convert to Job Card */}
+                <View style={styles.detailCard}>
+                  <Text style={styles.detailCardTitle}>CONVERT TO JOB</Text>
+
+                  <View style={styles.row2}>
+                    <View style={styles.col2}>
+                      <Text style={styles.labelSmall}>Latitude</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="e.g. 26.1775"
+                        placeholderTextColor="#9CA3AF"
+                        keyboardType="numeric"
+                        value={detailLat}
+                        onChangeText={setDetailLat}
+                      />
+                    </View>
+                    <View style={styles.spacer2} />
+                    <View style={styles.col2}>
+                      <Text style={styles.labelSmall}>Longitude</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="e.g. 85.8714"
+                        placeholderTextColor="#9CA3AF"
+                        keyboardType="numeric"
+                        value={detailLng}
+                        onChangeText={setDetailLng}
+                      />
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.modalBtn, { backgroundColor: '#e0f2fe', borderWidth: 1, borderColor: '#7dd3fc' }]}
                     onPress={handleUpdateLeadLocation}
                     disabled={updatingLocation}
                   >
                     {updatingLocation ? (
-                      <ActivityIndicator color="#fff" />
+                      <ActivityIndicator color="#0284c7" />
                     ) : (
-                      <Text style={styles.modalBtnPrimaryText}>Update location</Text>
+                      <Text style={[styles.modalBtnPrimaryText, { color: '#0284c7' }]}>Save location</Text>
                     )}
                   </TouchableOpacity>
-                </View>
 
-                {/* Assign staff for job created from this lead */}
-                <View style={styles.addLogSection}>
-                  <Text style={styles.labelSmall}>Assign staff for this job</Text>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    style={{ marginBottom: 6 }}
-                  >
+                  <Text style={[styles.labelSmall, { marginTop: 12, marginBottom: 6 }]}>Assign Staff</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
                     <View style={{ flexDirection: 'row', gap: 6 }}>
                       {(staff.filter((s) => s.isActive !== false) || []).map((s) => {
                         const id = s._id;
@@ -1109,63 +1120,64 @@ export default function LeadsScreen() {
                         return (
                           <TouchableOpacity
                             key={id}
-                            style={[
-                              styles.statusPill,
-                              active && styles.statusPillActive,
-                            ]}
+                            style={[styles.statusPill, active && styles.statusPillActive]}
                             onPress={() => {
                               if (active) {
-                                setSelectedJobStaffIds(
-                                  selectedJobStaffIds.filter((x) => x !== id)
-                                );
+                                setSelectedJobStaffIds(selectedJobStaffIds.filter((x) => x !== id));
                               } else {
                                 setSelectedJobStaffIds([...selectedJobStaffIds, id]);
                               }
                             }}
                           >
-                            <Text
-                              style={[
-                                styles.statusPillText,
-                                active && styles.statusPillTextActive,
-                              ]}
-                            >
-                              {s.name}
-                            </Text>
+                            <Text style={[styles.statusPillText, active && styles.statusPillTextActive]}>{s.name}</Text>
                           </TouchableOpacity>
                         );
                       })}
                     </View>
                   </ScrollView>
-                </View>
 
-                <View style={styles.logsSection}>
-                  <Text style={styles.logsTitle}>Conversation log</Text>
-                  <ScrollView style={styles.logsList}>
-                    {selectedLead.discussionLogs && selectedLead.discussionLogs.length > 0 ? (
-                      selectedLead.discussionLogs
-                        .slice()
-                        .reverse()
-                        .map((log, index) => (
-                          <View key={index} style={styles.logItem}>
-                            <Text style={styles.logDate}>
-                              {new Date(log.at).toLocaleString()} – {log.by}
-                            </Text>
-                            <Text style={styles.logNotes}>{log.notes}</Text>
-                            {log.nextFollowUpAt && (
-                              <Text style={styles.logNext}>
-                                Next: {new Date(log.nextFollowUpAt).toLocaleString()}
-                              </Text>
-                            )}
-                          </View>
-                        ))
+                  <TouchableOpacity
+                    style={[styles.modalBtn, styles.convertBtn]}
+                    onPress={handleCreateJobFromLead}
+                    disabled={creatingJobFromLead}
+                  >
+                    {creatingJobFromLead ? (
+                      <ActivityIndicator color="#fff" />
                     ) : (
-                      <Text style={styles.emptyLogText}>No discussions yet.</Text>
+                      <Text style={styles.convertBtnText}>✅ Convert to Job</Text>
                     )}
-                  </ScrollView>
+                  </TouchableOpacity>
+                  <Text style={{ fontSize: 11, color: '#64748b', marginTop: 6, textAlign: 'center' }}>Lead will move to Follow-up with 6-month reminder</Text>
                 </View>
 
-                <View style={styles.addLogSection}>
-                  <Text style={styles.label}>Add discussion (follow-up)</Text>
+                {/* Conversation Log Card */}
+                <View style={styles.detailCard}>
+                  <Text style={styles.detailCardTitle}>CONVERSATION LOG</Text>
+                  {selectedLead.discussionLogs && selectedLead.discussionLogs.length > 0 ? (
+                    selectedLead.discussionLogs
+                      .slice()
+                      .reverse()
+                      .map((log, index) => (
+                        <View key={index} style={styles.logItem}>
+                          <Text style={styles.logDate}>
+                            {new Date(log.at).toLocaleString()} – {log.by}
+                          </Text>
+                          <Text style={styles.logNotes}>{log.notes}</Text>
+                          {log.nextFollowUpAt && (
+                            <Text style={styles.logNext}>
+                              Next follow-up: {new Date(log.nextFollowUpAt).toLocaleDateString()}
+                            </Text>
+                          )}
+                        </View>
+                      ))
+                  ) : (
+                    <Text style={styles.emptyLogText}>No discussions yet.</Text>
+                  )}
+                </View>
+
+                {/* Add Discussion Card */}
+                <View style={styles.detailCard}>
+                  <Text style={styles.detailCardTitle}>ADD DISCUSSION</Text>
                   <TextInput
                     style={[styles.input, styles.textArea]}
                     placeholder="Notes from call / visit – price negotiated, etc."
@@ -1177,7 +1189,7 @@ export default function LeadsScreen() {
                   />
                   <View style={styles.row2}>
                     <View style={styles.col2}>
-                      <Text style={styles.labelSmall}>Quoted price (₹) – optional</Text>
+                      <Text style={styles.labelSmall}>Quoted price (₹)</Text>
                       <TextInput
                         style={styles.input}
                         placeholder="e.g. 800"
@@ -1189,7 +1201,7 @@ export default function LeadsScreen() {
                     </View>
                     <View style={styles.spacer2} />
                     <View style={styles.col2}>
-                      <Text style={styles.labelSmall}>Final price (₹) – optional</Text>
+                      <Text style={styles.labelSmall}>Final price (₹)</Text>
                       <TextInput
                         style={styles.input}
                         placeholder="e.g. 700"
@@ -1201,13 +1213,12 @@ export default function LeadsScreen() {
                     </View>
                   </View>
                   <CalendarPicker
-                    label="Next follow-up date (optional)"
+                    label="Next follow-up date"
                     placeholder="Select follow-up date"
                     value={logNextDate}
                     onChange={setLogNextDate}
                     small
                   />
-
                   <TouchableOpacity
                     style={[styles.modalBtn, styles.modalBtnPrimary]}
                     onPress={handleAddLog}
@@ -1217,17 +1228,6 @@ export default function LeadsScreen() {
                       <ActivityIndicator color="#fff" />
                     ) : (
                       <Text style={styles.modalBtnPrimaryText}>Save log</Text>
-                    )}
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.modalBtn, styles.convertBtn]}
-                    onPress={handleCreateJobFromLead}
-                    disabled={creatingJobFromLead}
-                  >
-                    {creatingJobFromLead ? (
-                      <ActivityIndicator color="#fff" />
-                    ) : (
-                      <Text style={styles.convertBtnText}>✅ Convert to job</Text>
                     )}
                   </TouchableOpacity>
                 </View>
@@ -1659,6 +1659,41 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginLeft: 8,
+  },
+  detailHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+    gap: 12,
+  },
+  detailHeaderName: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#0f172a',
+    flex: 1,
+    fontFamily: FONT_MEDIUM,
+  },
+  editLeadBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#f1f5f9',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  editLeadBtnActive: {
+    backgroundColor: '#ef4444',
+    borderColor: '#ef4444',
+  },
+  editLeadBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748b',
+    fontFamily: FONT_MEDIUM,
   },
 });
 
