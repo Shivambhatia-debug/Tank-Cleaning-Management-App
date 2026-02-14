@@ -15,8 +15,16 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AppHeader from '../../components/AppHeader';
+import DropdownPicker from '../../components/DropdownPicker';
+import CalendarPicker from '../../components/CalendarPicker';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../utils/api';
+
+const SOURCE_OPTIONS = ['Direct Call', 'WhatsApp', 'Facebook', 'Instagram', 'Google', 'Referral', 'Walk-in', 'JustDial', 'Other'];
+const SERVICE_TYPE_OPTIONS = ['Water Tank', 'Sump Cleaning', 'Overhead Tank', 'Underground Tank', 'RO Tank', 'Aquarium Tank', 'Septic Tank', 'Swimming Pool', 'Other'];
+const TANK_SIZE_OPTIONS = ['200', '500', '750', '1000', '1500', '2000', '3000', '5000', '10000'];
+const TIME_SLOT_OPTIONS = ['8:00 AM – 10:00 AM', '10:00 AM – 12:00 PM', '12:00 PM – 2:00 PM', '2:00 PM – 4:00 PM', '4:00 PM – 6:00 PM', '6:00 PM – 8:00 PM'];
+const PAYMENT_MODE_OPTIONS = ['Pending', 'Cash', 'UPI', 'Online', 'Card'];
 
 const JOB_STATUS_OPTIONS = [
   'New Lead',
@@ -67,6 +75,7 @@ export default function LeadsScreen() {
   const { user } = useAuth();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [staff, setStaff] = useState<any[]>([]);
+  const [services, setServices] = useState<{ name: string; startingPrice: number | null }[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filterStatus, setFilterStatus] = useState<(typeof STATUS_OPTIONS)[number]>('All');
@@ -119,12 +128,14 @@ export default function LeadsScreen() {
     try {
       const params: any = {};
       if (filterStatus !== 'All') params.status = filterStatus;
-      const [leadsRes, staffRes] = await Promise.all([
+      const [leadsRes, staffRes, servicesRes] = await Promise.all([
         api.get<Lead[]>('/leads', { params }),
         api.get('/users?role=staff'),
+        api.get('/services').catch(() => ({ data: [] })),
       ]);
       setLeads(leadsRes.data);
       setStaff(Array.isArray(staffRes.data) ? staffRes.data : []);
+      setServices(Array.isArray(servicesRes.data) ? servicesRes.data : []);
     } catch (err: any) {
       console.error('Error loading leads', err.response?.data || err.message);
       Alert.alert('Error', 'Failed to load leads');
@@ -528,13 +539,12 @@ export default function LeadsScreen() {
                 onChangeText={(t) => setNewLead({ ...newLead, address: t })}
               />
 
-              <Text style={styles.label}>Source</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Facebook / WhatsApp / Call"
-                placeholderTextColor="#9CA3AF"
+              <DropdownPicker
+                label="Source"
+                placeholder="Select source"
                 value={newLead.source}
-                onChangeText={(t) => setNewLead({ ...newLead, source: t })}
+                options={SOURCE_OPTIONS}
+                onSelect={(v) => setNewLead({ ...newLead, source: v })}
               />
 
               <Text style={styles.label}>WhatsApp (optional)</Text>
@@ -593,26 +603,35 @@ export default function LeadsScreen() {
 
               <View style={styles.row2}>
                 <View style={styles.col2}>
-                  <Text style={styles.label}>Service Type</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="e.g. Water Tank"
-                    placeholderTextColor="#9CA3AF"
+                  <DropdownPicker
+                    label="Service Type"
+                    placeholder="Select type"
                     value={newLead.serviceType}
-                    onChangeText={(t) => setNewLead({ ...newLead, serviceType: t })}
+                    options={SERVICE_TYPE_OPTIONS}
+                    onSelect={(v) => setNewLead({ ...newLead, serviceType: v })}
                   />
                 </View>
                 <View style={styles.spacer2} />
                 <View style={styles.col2}>
-                  <Text style={styles.label}>Tank Size (Ltr)</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="e.g. 1000"
-                    placeholderTextColor="#9CA3AF"
-                    keyboardType="numeric"
+                  <DropdownPicker
+                    label="Tank Size (Ltr)"
+                    placeholder="Select size"
                     value={newLead.tankSizeLtr}
-                    onChangeText={(t) => setNewLead({ ...newLead, tankSizeLtr: t })}
+                    options={TANK_SIZE_OPTIONS}
+                    onSelect={(v) => setNewLead({ ...newLead, tankSizeLtr: v })}
                   />
+                </View>
+              </View>
+
+              <View style={styles.serviceRefBox}>
+                <Text style={styles.serviceRefTitle}>Cleaning & pest control – starting prices (reference)</Text>
+                <View style={styles.serviceRefGrid}>
+                  {services.map((s, idx) => (
+                    <View key={idx} style={styles.serviceRefItem}>
+                      <Text style={styles.serviceRefName}>{s.name}</Text>
+                      <Text style={styles.serviceRefPrice}>{s.startingPrice != null ? `₹${s.startingPrice}` : 'On request'}</Text>
+                    </View>
+                  ))}
                 </View>
               </View>
 
@@ -656,46 +675,41 @@ export default function LeadsScreen() {
                 </View>
                 <View style={styles.spacer2} />
                 <View style={styles.col2}>
-                  <Text style={styles.label}>Booking Date (optional)</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="e.g. 2026-02-20"
-                    placeholderTextColor="#9CA3AF"
+                  <CalendarPicker
+                    label="Booking Date"
+                    placeholder="Select date"
                     value={newLead.bookingDate}
-                    onChangeText={(t) => setNewLead({ ...newLead, bookingDate: t })}
+                    onChange={(d) => setNewLead({ ...newLead, bookingDate: d })}
                   />
                 </View>
               </View>
 
-              <Text style={styles.label}>Time Slot (optional)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. 10:00 AM – 12:00 PM"
-                placeholderTextColor="#9CA3AF"
+              <DropdownPicker
+                label="Time Slot (optional)"
+                placeholder="Select time slot"
                 value={newLead.timeSlot}
-                onChangeText={(t) => setNewLead({ ...newLead, timeSlot: t })}
+                options={TIME_SLOT_OPTIONS}
+                onSelect={(v) => setNewLead({ ...newLead, timeSlot: v })}
               />
 
               <View style={styles.row2}>
                 <View style={styles.col2}>
-                  <Text style={styles.label}>Payment Status</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="pending / paid"
-                    placeholderTextColor="#9CA3AF"
-                    value={newLead.paymentStatus}
-                    onChangeText={(t) => setNewLead({ ...newLead, paymentStatus: t })}
+                  <DropdownPicker
+                    label="Payment Status"
+                    placeholder="Select"
+                    value={newLead.paymentStatus as string}
+                    options={[...PAYMENT_STATUS_OPTIONS]}
+                    onSelect={(v) => setNewLead({ ...newLead, paymentStatus: v as any })}
                   />
                 </View>
                 <View style={styles.spacer2} />
                 <View style={styles.col2}>
-                  <Text style={styles.label}>Payment Mode</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="cash / upi / online"
-                    placeholderTextColor="#9CA3AF"
+                  <DropdownPicker
+                    label="Payment Mode"
+                    placeholder="Select mode"
                     value={newLead.paymentMode}
-                    onChangeText={(t) => setNewLead({ ...newLead, paymentMode: t })}
+                    options={PAYMENT_MODE_OPTIONS}
+                    onSelect={(v) => setNewLead({ ...newLead, paymentMode: v })}
                   />
                 </View>
               </View>
@@ -946,13 +960,12 @@ export default function LeadsScreen() {
                     value={logText}
                     onChangeText={setLogText}
                   />
-                  <Text style={styles.labelSmall}>Next follow‑up (optional, ISO or leave blank)</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="e.g. 2026-02-20T10:00:00"
-                    placeholderTextColor="#9CA3AF"
+                  <CalendarPicker
+                    label="Next follow-up date (optional)"
+                    placeholder="Select follow-up date"
                     value={logNextDate}
-                    onChangeText={setLogNextDate}
+                    onChange={setLogNextDate}
+                    small
                   />
 
                   <TouchableOpacity
@@ -1169,6 +1182,44 @@ const styles = StyleSheet.create({
   },
   spacer2: {
     width: 10,
+  },
+  serviceRefBox: {
+    backgroundColor: '#f0f9ff',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#bae6fd',
+  },
+  serviceRefTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#0369a1',
+    marginBottom: 8,
+  },
+  serviceRefGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  serviceRefItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    gap: 4,
+  },
+  serviceRefName: {
+    fontSize: 11,
+    color: '#334155',
+    fontWeight: '500',
+  },
+  serviceRefPrice: {
+    fontSize: 11,
+    color: '#0EA5E9',
+    fontWeight: '600',
   },
   modalButtons: {
     flexDirection: 'row',

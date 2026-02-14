@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
+import { setOnUnauthorized } from '../utils/api';
 
 interface User {
   id: string;
@@ -59,7 +60,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       await AsyncStorage.removeItem('user');
       await AsyncStorage.removeItem('token');
@@ -69,7 +70,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error) {
       console.error('Error logging out:', error);
     }
-  };
+  }, [router]);
+
+  useEffect(() => {
+    setOnUnauthorized(() => {
+      setUser(null);
+      setToken(null);
+      router.replace('/(auth)/login');
+    });
+    return () => setOnUnauthorized(null);
+  }, [router]);
 
   const updateUser = (updates: Partial<User>) => {
     if (user) {

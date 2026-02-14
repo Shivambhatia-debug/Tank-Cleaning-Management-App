@@ -49,6 +49,26 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
+let onUnauthorized: (() => void) | null = null;
+export function setOnUnauthorized(fn: () => void) {
+  onUnauthorized = fn;
+}
+
+api.interceptors.response.use(
+  (res) => res,
+  async (err) => {
+    const status = err.response?.status;
+    const message = (err.response?.data?.message || '').toLowerCase();
+    const isAuthError = status === 401 || (status === 400 && message.includes('token'));
+    if (isAuthError) {
+      await AsyncStorage.removeItem('token');
+      await AsyncStorage.removeItem('user');
+      onUnauthorized?.();
+    }
+    return Promise.reject(err);
+  }
+);
+
 export default api;
 export const getUploadsBaseUrl = (): string => getBaseUrl();
 export const getApiBaseUrl = (): string => `${getBaseUrl()}/api`;

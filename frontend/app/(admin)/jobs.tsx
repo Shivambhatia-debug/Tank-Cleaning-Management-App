@@ -19,6 +19,13 @@ import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker } from 'react-native-maps';
 import api, { getUploadsBaseUrl } from '../../utils/api';
 import BrandText from '../../components/BrandText';
+import DropdownPicker from '../../components/DropdownPicker';
+import CalendarPicker from '../../components/CalendarPicker';
+
+const TANK_SIZE_OPTIONS = ['500L', '750L', '1000L', '1500L', '2000L', '3000L', '5000L', '10000L'];
+const SERVICE_TYPE_OPTIONS = ['Water Tank', 'Sump Cleaning', 'Overhead Tank', 'Underground Tank', 'RO Tank', 'Aquarium Tank', 'Septic Tank', 'Swimming Pool', 'Other'];
+const LEAD_SOURCE_OPTIONS = ['Call', 'WhatsApp', 'Facebook', 'Instagram', 'Google', 'Referral', 'Walk-in', 'JustDial', 'Lead', 'Other'];
+const PAYMENT_MODE_OPTIONS = ['pending', 'cash', 'upi', 'online', 'card'];
 
 const DEFAULT_MAP_REGION = {
   latitude: 26.1775,
@@ -27,9 +34,30 @@ const DEFAULT_MAP_REGION = {
   longitudeDelta: 0.02,
 };
 
+function CompletionPhotoImage({ filename, getUploadsBaseUrl, style }: { filename: string; getUploadsBaseUrl: () => string; style: any }) {
+  const [loadError, setLoadError] = useState(false);
+  const uri = `${getUploadsBaseUrl()}/uploads/${filename}`;
+  if (loadError) {
+    return (
+      <View style={[style, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={{ fontSize: 12, color: '#666' }}>📷 Photo unavailable</Text>
+      </View>
+    );
+  }
+  return (
+    <Image
+      source={{ uri }}
+      style={style}
+      resizeMode="cover"
+      onError={() => setLoadError(true)}
+    />
+  );
+}
+
 export default function JobsManagementScreen() {
   const [jobs, setJobs] = useState<any[]>([]);
   const [staff, setStaff] = useState<any[]>([]);
+  const [services, setServices] = useState<{ name: string; startingPrice: number | null }[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
@@ -59,12 +87,14 @@ export default function JobsManagementScreen() {
 
   const loadData = async () => {
     try {
-      const [jobsRes, staffRes] = await Promise.all([
+      const [jobsRes, staffRes, servicesRes] = await Promise.all([
         api.get('/jobs'),
         api.get('/users?role=staff'),
+        api.get('/services').catch(() => ({ data: [] })),
       ]);
       setJobs(jobsRes.data);
       setStaff(staffRes.data);
+      setServices(Array.isArray(servicesRes.data) ? servicesRes.data : []);
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
@@ -110,13 +140,11 @@ export default function JobsManagementScreen() {
         leadSource: newJob.lead_source,
         serviceCharge: Number(newJob.service_charge) || 0,
         paymentMode: (newJob.payment_mode || 'pending').toLowerCase(),
+        incentivePerJob: Number(newJob.incentive_per_job) || 0,
       };
 
       if (newJob.scheduled_at) {
         jobData.scheduledAt = newJob.scheduled_at;
-      }
-      if (newJob.incentive_per_job) {
-        jobData.incentivePerJob = Number(newJob.incentive_per_job) || 0;
       }
 
       await api.post('/jobs', jobData);
@@ -238,7 +266,10 @@ export default function JobsManagementScreen() {
         <Text style={{ fontSize: 12, color: '#555' }}>📱 {item.mobileNumber || 'N/A'}</Text>
         <Text style={{ fontSize: 12, color: '#555' }}>🛢 {item.tankSize} • {item.serviceType}</Text>
         <Text style={{ fontSize: 12, color: '#555' }}>
-          💰 {item.paymentStatus === 'paid' ? 'Paid' : 'Payment pending'} • ₹{item.serviceCharge || 0}
+          💰 {item.paymentStatus === 'paid' ? 'Paid' : 'Payment pending'} • {(item.serviceCharge ?? item.service_charge) > 0 ? `₹${Number(item.serviceCharge ?? item.service_charge).toLocaleString('en-IN')}` : 'Price on request'}
+        </Text>
+        <Text style={{ fontSize: 12, color: '#555' }}>
+          👷 Per job incentive: {(item.incentivePerJob ?? item.incentive_per_job) != null && (item.incentivePerJob ?? item.incentive_per_job) !== '' ? `₹${Number(item.incentivePerJob ?? item.incentive_per_job).toLocaleString('en-IN')}` : '—'}
         </Text>
         {item.scheduledAt && (
           <Text style={{ fontSize: 11, color: '#6b7280' }}>
@@ -252,22 +283,22 @@ export default function JobsManagementScreen() {
         )}
       </View>
 
-      {item.completionPhoto && (
+      {(item.completionPhoto || item.completion_photo) && (
         <View style={{ marginBottom: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#eee' }}>
           <Text style={{ fontSize: 12, color: '#333', fontWeight: '500', marginBottom: 6 }}>📷 Completion Photo</Text>
-          <Image
-            source={{ uri: `${getUploadsBaseUrl()}/uploads/${item.completionPhoto}` }}
+          <CompletionPhotoImage
+            filename={item.completionPhoto || item.completion_photo}
+            getUploadsBaseUrl={getUploadsBaseUrl}
             style={styles.completionThumb}
-            resizeMode="cover"
           />
-          {item.completionPhotoAt && (
+          {(item.completionPhotoAt || item.completion_photo_at) && (
             <Text style={{ fontSize: 11, color: '#666', marginTop: 4 }}>
-              📅 {new Date(item.completionPhotoAt).toLocaleDateString()} {new Date(item.completionPhotoAt).toLocaleTimeString()}
+              📅 {new Date(item.completionPhotoAt || item.completion_photo_at).toLocaleDateString()} {new Date(item.completionPhotoAt || item.completion_photo_at).toLocaleTimeString()}
             </Text>
           )}
-          {item.completionLatitude != null && item.completionLongitude != null && (
+          {(item.completionLatitude != null || item.completion_latitude != null) && (item.completionLongitude != null || item.completion_longitude != null) && (
             <Text style={{ fontSize: 11, color: '#666' }}>
-              📍 {Number(item.completionLatitude).toFixed(5)}, {Number(item.completionLongitude).toFixed(5)}
+              📍 {Number(item.completionLatitude ?? item.completion_latitude).toFixed(5)}, {Number(item.completionLongitude ?? item.completion_longitude).toFixed(5)}
             </Text>
           )}
         </View>
@@ -433,12 +464,12 @@ export default function JobsManagementScreen() {
 
               <View style={styles.row}>
                 <View style={styles.col}>
-                  <Text style={styles.label}>Tank Size</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="e.g. 1000L"
+                  <DropdownPicker
+                    label="Tank Size"
+                    placeholder="Select size"
                     value={newJob.tank_size}
-                    onChangeText={(text) => setNewJob({ ...newJob, tank_size: text })}
+                    options={TANK_SIZE_OPTIONS}
+                    onSelect={(v) => setNewJob({ ...newJob, tank_size: v })}
                   />
                 </View>
                 <View style={{ width: 10 }} />
@@ -454,13 +485,12 @@ export default function JobsManagementScreen() {
                 </View>
               </View>
 
-          <Text style={styles.label}>Scheduled Date & Time (optional)</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="e.g. 2026-02-11T10:00:00"
-            value={newJob.scheduled_at}
-            onChangeText={(text) => setNewJob({ ...newJob, scheduled_at: text })}
-          />
+              <CalendarPicker
+                label="Scheduled Date (optional)"
+                placeholder="Select date"
+                value={newJob.scheduled_at ? newJob.scheduled_at.slice(0, 10) : ''}
+                onChange={(d) => setNewJob({ ...newJob, scheduled_at: d ? `${d}T10:00:00` : '' })}
+              />
 
           <View style={styles.row}>
             <View style={styles.col}>
@@ -475,31 +505,48 @@ export default function JobsManagementScreen() {
             </View>
             <View style={{ width: 10 }} />
             <View style={styles.col}>
-              <Text style={styles.label}>Payment mode</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="cash / upi / online / pending"
+              <DropdownPicker
+                label="Payment Mode"
+                placeholder="Select mode"
                 value={newJob.payment_mode}
-                onChangeText={(text) => setNewJob({ ...newJob, payment_mode: text })}
+                options={PAYMENT_MODE_OPTIONS}
+                onSelect={(v) => setNewJob({ ...newJob, payment_mode: v })}
               />
             </View>
           </View>
 
-              <Text style={styles.label}>Service Details</Text>
               <View style={styles.row}>
-                <TextInput
-                  style={[styles.input, styles.col]}
-                  placeholder="Service Type (Water Tank)"
-                  value={newJob.service_type}
-                  onChangeText={(text) => setNewJob({ ...newJob, service_type: text })}
-                />
+                <View style={styles.col}>
+                  <DropdownPicker
+                    label="Service Type"
+                    placeholder="Select type"
+                    value={newJob.service_type}
+                    options={SERVICE_TYPE_OPTIONS}
+                    onSelect={(v) => setNewJob({ ...newJob, service_type: v })}
+                  />
+                </View>
                 <View style={{ width: 10 }} />
-                <TextInput
-                  style={[styles.input, styles.col]}
-                  placeholder="Lead Source (FB/Ref)"
-                  value={newJob.lead_source}
-                  onChangeText={(text) => setNewJob({ ...newJob, lead_source: text })}
-                />
+                <View style={styles.col}>
+                  <DropdownPicker
+                    label="Lead Source"
+                    placeholder="Select source"
+                    value={newJob.lead_source}
+                    options={LEAD_SOURCE_OPTIONS}
+                    onSelect={(v) => setNewJob({ ...newJob, lead_source: v })}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.serviceRefBox}>
+                <Text style={styles.serviceRefTitle}>Cleaning & pest control – starting prices (reference)</Text>
+                <View style={styles.serviceRefGrid}>
+                  {services.map((s, idx) => (
+                    <View key={idx} style={styles.serviceRefItem}>
+                      <Text style={styles.serviceRefName}>{s.name}</Text>
+                      <Text style={styles.serviceRefPrice}>{s.startingPrice != null ? `₹${s.startingPrice}` : 'On request'}</Text>
+                    </View>
+                  ))}
+                </View>
               </View>
 
               <Text style={styles.label}>Notes</Text>
@@ -818,6 +865,44 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     marginBottom: 4,
+  },
+  serviceRefBox: {
+    backgroundColor: '#f0f9ff',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#bae6fd',
+  },
+  serviceRefTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#0369a1',
+    marginBottom: 8,
+  },
+  serviceRefGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  serviceRefItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    gap: 4,
+  },
+  serviceRefName: {
+    fontSize: 11,
+    color: '#334155',
+    fontWeight: '500',
+  },
+  serviceRefPrice: {
+    fontSize: 11,
+    color: '#0EA5E9',
+    fontWeight: '600',
   },
   previewMapWrap: {
     marginTop: 4,

@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import api from '../../utils/api';
 import BrandText from '../../components/BrandText';
+import CalendarPicker from '../../components/CalendarPicker';
 
 const STAFF_TYPE_OPTIONS = ['Full Time', 'Part Time'] as const;
 const STAFF_STATUS_OPTIONS = ['Active', 'Inactive', 'Terminated'] as const;
@@ -357,13 +358,11 @@ export default function StaffManagementScreen() {
                 </View>
               </View>
 
-              <Text style={styles.label}>Joining Date (optional)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. 2026-02-11"
-                placeholderTextColor="#9CA3AF"
+              <CalendarPicker
+                label="Joining Date (optional)"
+                placeholder="Select date"
                 value={newStaff.joiningDate}
-                onChangeText={(t) => setNewStaff({ ...newStaff, joiningDate: t })}
+                onChange={(d) => setNewStaff({ ...newStaff, joiningDate: d })}
               />
 
               <Text style={styles.label}>Status</Text>
@@ -473,13 +472,10 @@ export default function StaffManagementScreen() {
                           Total jobs: {staffStats.totalJobs} • Completed: {staffStats.completedJobs} ({staffStats.completionRate}%)
                         </Text>
                         <Text style={styles.statsLine}>
-                          Total revenue generated: ₹{staffStats.totalRevenue || 0}
+                          Revenue (from jobs): ₹{(staffStats.totalRevenue ?? 0).toLocaleString('en-IN')} total • ₹{(staffStats.monthlyRevenue ?? 0).toLocaleString('en-IN')} this month
                         </Text>
                         <Text style={styles.statsLine}>
-                          This month revenue: ₹{staffStats.monthlyRevenue || 0}
-                        </Text>
-                        <Text style={styles.statsLine}>
-                          Total incentive (per‑job): ₹{staffStats.totalIncentive || 0}
+                          Per‑job incentive earned: ₹{(staffStats.totalIncentive ?? 0).toLocaleString('en-IN')} total • ₹{(staffStats.monthlyIncentive ?? 0).toLocaleString('en-IN')} this month
                         </Text>
                       </>
                     )}

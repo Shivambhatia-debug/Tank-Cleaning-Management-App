@@ -12,6 +12,7 @@ const Job = require('./models/Job');
 const Location = require('./models/Location');
 const Lead = require('./models/Lead');
 const Expense = require('./models/Expense');
+const Service = require('./models/Service');
 
 const app = express();
 // On Vercel (serverless) we don't create HTTP server or Socket.io - they cause crash
@@ -60,6 +61,7 @@ if (process.env.MONGO_URI) {
         .then(() => {
             console.log('✅ MongoDB connected');
             seedAdmin();
+            seedServices();
         })
         .catch(err => console.error('❌ MongoDB connection error:', err));
 } else if (!process.env.VERCEL) {
@@ -87,6 +89,61 @@ function seedAdmin() {
     })();
 }
 
+const DEFAULT_SERVICES = [
+    { name: 'Water Tank', startingPrice: 299, order: 1 },
+    { name: 'Kitchen Cleaning', startingPrice: 849, order: 2 },
+    { name: 'Sofa Cleaning', startingPrice: 499, order: 3 },
+    { name: 'Pest Control', startingPrice: 999, order: 4 },
+    { name: 'House Cleaning', startingPrice: 2499, order: 5 },
+    { name: 'Bathroom Cleaning', startingPrice: 499, order: 6 },
+    { name: 'Aquarium Tank', startingPrice: null, order: 7 },
+    { name: 'Septic Tank', startingPrice: null, order: 8 },
+    { name: 'Sewage Tank', startingPrice: null, order: 9 },
+    { name: 'Sump Cleaning', startingPrice: null, order: 10 },
+    { name: 'Overhead Tank', startingPrice: null, order: 11 },
+    { name: 'Swimming Pool', startingPrice: null, order: 12 },
+    { name: 'Housekeeping', startingPrice: null, order: 13 },
+    { name: 'Move In / Move Out', startingPrice: null, order: 14 },
+    { name: 'Office Cleaning', startingPrice: null, order: 15 },
+    { name: 'Car Wash', startingPrice: null, order: 16 },
+    { name: 'Carpet Cleaning', startingPrice: null, order: 17 },
+    { name: 'Floor Cleaning', startingPrice: null, order: 18 },
+    { name: 'Other', startingPrice: null, order: 99 },
+];
+
+function seedServices() {
+    return (async () => {
+        try {
+            const count = await Service.countDocuments();
+            if (count === 0) {
+                await Service.insertMany(DEFAULT_SERVICES);
+                console.log('✅ Default services with prices seeded');
+            }
+        } catch (error) {
+            console.error('Seed services error:', error);
+        }
+    })();
+}
+
+// Wait for DB (serverless cold start); if still not connected, return 503
+const requireDb = (req, res, next) => {
+    const maxWaitMs = 22000;
+    const stepMs = 500;
+    let waited = 0;
+    const check = () => {
+        if (mongoose.connection.readyState === 1) return next();
+        if (waited >= maxWaitMs) {
+            return res.status(503).json({
+                message: 'Database not connected. Check MongoDB Atlas: Network Access allow 0.0.0.0/0 and correct MONGO_URI on Vercel.',
+                code: 'DB_DISCONNECTED'
+            });
+        }
+        waited += stepMs;
+        setTimeout(check, stepMs);
+    };
+    check();
+};
+
 // Middleware
 const auth = (req, res, next) => {
     const token = req.header('Authorization')?.replace('Bearer ', '');
@@ -97,7 +154,7 @@ const auth = (req, res, next) => {
         req.user = verified;
         next();
     } catch (err) {
-        res.status(400).json({ message: 'Invalid token' });
+        res.status(401).json({ message: 'Invalid or expired token' });
     }
 };
 
@@ -540,6 +597,37 @@ app.get('/api/expenses', auth, async (req, res) => {
     }
 });
 
+// --- SERVICES (custom starting prices for job/lead forms) ---
+
+app.get('/api/services', auth, async (req, res) => {
+    try {
+        const list = await Service.find().sort({ order: 1, name: 1 });
+        res.json(list);
+    } catch (err) {
+        res.status(500).json({ message: err.message || 'Failed to load services' });
+    }
+});
+
+app.put('/api/services', auth, async (req, res) => {
+    if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
+    try {
+        const items = Array.isArray(req.body) ? req.body : req.body.items || [];
+        await Service.deleteMany({});
+        if (items.length > 0) {
+            const docs = items.map((item, i) => ({
+                name: String(item.name || '').trim(),
+                startingPrice: item.startingPrice != null && item.startingPrice !== '' ? Number(item.startingPrice) : null,
+                order: typeof item.order === 'number' ? item.order : i,
+            })).filter(d => d.name);
+            await Service.insertMany(docs);
+        }
+        const list = await Service.find().sort({ order: 1, name: 1 });
+        res.json(list);
+    } catch (err) {
+        res.status(500).json({ message: err.message || 'Failed to update services' });
+    }
+});
+
 // --- JOB ROUTES ---
 
 // Helper: add months safely (repeat cleaning reminder = +6 months)
@@ -843,13 +931,14 @@ app.get('/api/health', async (req, res) => {
         uploadRoute: 'POST /api/jobs/:id/upload',
         dbConnected: dbReady,
         hasJwtSecret: !!process.env.JWT_SECRET,
-        hasMongoUri: !!process.env.MONGO_URI
+        hasMongoUri: !!process.env.MONGO_URI,
+        ...(dbReady ? {} : { hint: 'Fix: Atlas Network Access → Add 0.0.0.0/0, and ensure MONGO_URI is correct in Vercel env.' })
     });
 });
 
 // --- STATS ROUTES ---
 
-app.get('/api/stats/dashboard', auth, async (req, res) => {
+app.get('/api/stats/dashboard', auth, requireDb, async (req, res) => {
     try {
         const totalJobs = await Job.countDocuments();
         const pendingJobs = await Job.countDocuments({ status: 'pending' });
@@ -888,13 +977,19 @@ app.get('/api/stats/staff/:id', auth, async (req, res) => {
         const completedJobs = allJobs.filter(j => j.status === 'completed').length;
         const totalRevenue = allJobs.reduce((sum, j) => sum + (j.serviceCharge || 0), 0);
 
-        // Incentive calculation: per completed job * incentivePerJob (fallback 20)
+        // Incentive: per completed job uses incentivePerJob (fallback 20)
         const DEFAULT_INCENTIVE = 20;
         const completedForIncentive = allJobs.filter(j => j.status === 'completed');
         const totalIncentive = completedForIncentive.reduce((sum, j) => {
             const per = j.incentivePerJob != null && !isNaN(j.incentivePerJob) ? j.incentivePerJob : DEFAULT_INCENTIVE;
             return sum + per;
         }, 0);
+        const monthlyIncentive = monthlyJobs
+            .filter(j => j.status === 'completed')
+            .reduce((sum, j) => {
+                const per = j.incentivePerJob != null && !isNaN(j.incentivePerJob) ? j.incentivePerJob : DEFAULT_INCENTIVE;
+                return sum + per;
+            }, 0);
 
         const monthlyRevenue = monthlyJobs.reduce((sum, j) => sum + (j.serviceCharge || 0), 0);
 
@@ -905,6 +1000,7 @@ app.get('/api/stats/staff/:id', auth, async (req, res) => {
             totalRevenue,
             monthlyRevenue,
             totalIncentive,
+            monthlyIncentive,
             completionRate: totalJobs ? Math.round((completedJobs / totalJobs) * 100) : 0
         });
     } catch (err) {
@@ -948,17 +1044,21 @@ app.get('/api/reports/summary', auth, async (req, res) => {
         const dailyExpense = dailyExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
         const dailyNetProfit = dailyRevenue - dailyExpense;
 
-        // Staff wise revenue (paid)
+        // Staff wise: revenue (from paid jobs), incentive (from completed jobs), job count; with staff name
         const staffWise = await Job.aggregate([
-            { $match: { paymentStatus: 'paid', assignedStaff: { $exists: true, $ne: [] } } },
+            { $match: { assignedStaff: { $exists: true, $ne: [] } } },
             { $unwind: '$assignedStaff' },
             {
                 $group: {
                     _id: '$assignedStaff',
-                    revenue: { $sum: { $ifNull: ['$serviceCharge', 0] } },
-                    jobs: { $sum: 1 }
+                    jobs: { $sum: 1 },
+                    revenue: { $sum: { $cond: [{ $eq: ['$paymentStatus', 'paid'] }, { $ifNull: ['$serviceCharge', 0] }, 0] } },
+                    incentive: { $sum: { $cond: [{ $eq: ['$status', 'completed'] }, { $ifNull: ['$incentivePerJob', 0] }, 0] } }
                 }
-            }
+            },
+            { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'staffDoc' } },
+            { $unwind: { path: '$staffDoc', preserveNullAndEmptyArrays: true } },
+            { $project: { _id: 1, jobs: 1, revenue: 1, incentive: 1, staffName: { $ifNull: ['$staffDoc.name', ''] } } }
         ]);
 
         // Pending payments

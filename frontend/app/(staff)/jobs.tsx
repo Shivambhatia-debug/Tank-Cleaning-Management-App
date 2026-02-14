@@ -38,6 +38,16 @@ export default function StaffJobsScreen() {
     }
   };
 
+  const totalEarned = jobs.filter((j: any) => j.status === 'completed').reduce((s: number, j: any) => s + (Number(j.incentivePerJob ?? j.incentive_per_job) || 0), 0);
+  const thisMonthEarned = jobs
+    .filter((j: any) => j.status === 'completed' && j.timeline?.completedAt) 
+    .filter((j: any) => {
+      const d = new Date(j.timeline.completedAt);
+      const now = new Date();
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    })
+    .reduce((s: number, j: any) => s + (Number(j.incentivePerJob ?? j.incentive_per_job) || 0), 0);
+
   const onRefresh = () => {
     setRefreshing(true);
     loadJobs();
@@ -69,7 +79,9 @@ export default function StaffJobsScreen() {
     }
   };
 
-  const renderJob = ({ item }: { item: any }) => (
+  const renderJob = ({ item }: { item: any }) => {
+    const incentive = Number(item.incentivePerJob ?? item.incentive_per_job) || 0;
+    return (
     <TouchableOpacity
       style={styles.jobCard}
       onPress={() => router.push({
@@ -94,6 +106,16 @@ export default function StaffJobsScreen() {
           {item.address}
         </Text>
       </View>
+      <View style={styles.jobDetails}>
+        <Text style={styles.detailLine}>📱 {item.mobileNumber || 'N/A'}</Text>
+        <Text style={styles.detailLine}>🛢 {item.tankSize || '—'} • {item.serviceType || '—'}</Text>
+        <Text style={styles.detailLine}>
+          💰 {item.paymentStatus === 'paid' ? 'Paid' : 'Pending'} • {(item.serviceCharge ?? item.service_charge) > 0 ? `₹${Number(item.serviceCharge ?? item.service_charge).toLocaleString('en-IN')}` : 'Price on request'}
+        </Text>
+        <Text style={styles.incentiveLine}>
+          👷 Incentive {item.status === 'completed' ? 'earned' : 'on completion'}: ₹{incentive.toLocaleString('en-IN')}
+        </Text>
+      </View>
       {item.notes && (
         <Text style={styles.notes} numberOfLines={2}>
           {item.notes}
@@ -104,6 +126,7 @@ export default function StaffJobsScreen() {
       </View>
     </TouchableOpacity>
   );
+  };
 
   if (loading) {
     return (
@@ -124,6 +147,19 @@ export default function StaffJobsScreen() {
         contentContainerStyle={styles.list}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        ListHeaderComponent={
+          <View style={styles.earningsCard}>
+            <Text style={styles.earningsTitle}>💰 Your earnings (incentive)</Text>
+            <View style={styles.earningsRow}>
+              <Text style={styles.earningsLabel}>Total earned</Text>
+              <Text style={styles.earningsValue}>₹{totalEarned.toLocaleString('en-IN')}</Text>
+            </View>
+            <View style={styles.earningsRow}>
+              <Text style={styles.earningsLabel}>This month</Text>
+              <Text style={styles.earningsValue}>₹{thisMonthEarned.toLocaleString('en-IN')}</Text>
+            </View>
+          </View>
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
@@ -148,6 +184,35 @@ const styles = StyleSheet.create({
   },
   list: {
     padding: 16,
+  },
+  earningsCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#e2e8f0',
+  },
+  earningsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    marginBottom: 10,
+  },
+  earningsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  earningsLabel: {
+    fontSize: 13,
+    color: '#64748b',
+  },
+  earningsValue: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#16a34a',
   },
   jobCard: {
     backgroundColor: '#fff',
@@ -197,6 +262,23 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#64748b',
     flex: 1,
+  },
+  jobDetails: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#e2e8f0',
+  },
+  detailLine: {
+    fontSize: 12,
+    color: '#555',
+    marginBottom: 2,
+  },
+  incentiveLine: {
+    fontSize: 12,
+    color: '#16a34a',
+    fontWeight: '600',
+    marginTop: 2,
   },
   notes: {
     fontSize: 13,

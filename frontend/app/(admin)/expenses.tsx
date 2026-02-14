@@ -14,9 +14,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import api from '../../utils/api';
 import BrandText from '../../components/BrandText';
+import DropdownPicker from '../../components/DropdownPicker';
+import CalendarPicker from '../../components/CalendarPicker';
 
 const CATEGORY_OPTIONS = ['Staff', 'Fuel', 'Chemical', 'Repair', 'Miscellaneous'] as const;
-const PAYMENT_MODE_HINT = 'cash / upi / online';
+const EXPENSE_PAYMENT_MODES = ['Cash', 'UPI', 'Online', 'Card', 'Bank Transfer'];
 
 export default function ExpensesScreen() {
   const [expenses, setExpenses] = useState<any[]>([]);
@@ -203,13 +205,11 @@ export default function ExpensesScreen() {
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Add expense</Text>
             <ScrollView style={{ maxHeight: 460 }} showsVerticalScrollIndicator={false}>
-              <Text style={styles.label}>Date *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. 2026-02-11"
-                placeholderTextColor="#9CA3AF"
+              <CalendarPicker
+                label="Date *"
+                placeholder="Select date"
                 value={newExpense.date}
-                onChangeText={(t) => setNewExpense({ ...newExpense, date: t })}
+                onChange={(d) => setNewExpense({ ...newExpense, date: d })}
               />
 
               <Text style={styles.label}>Amount (₹) *</Text>
@@ -260,13 +260,12 @@ export default function ExpensesScreen() {
                 onChangeText={(t) => setNewExpense({ ...newExpense, staffName: t })}
               />
 
-              <Text style={styles.label}>Payment Mode</Text>
-              <TextInput
-                style={styles.input}
-                placeholder={PAYMENT_MODE_HINT}
-                placeholderTextColor="#9CA3AF"
+              <DropdownPicker
+                label="Payment Mode"
+                placeholder="Select payment mode"
                 value={newExpense.paymentMode}
-                onChangeText={(t) => setNewExpense({ ...newExpense, paymentMode: t })}
+                options={EXPENSE_PAYMENT_MODES}
+                onSelect={(v) => setNewExpense({ ...newExpense, paymentMode: v })}
               />
 
               <Text style={styles.label}>Notes</Text>

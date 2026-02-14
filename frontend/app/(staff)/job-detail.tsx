@@ -30,8 +30,7 @@ export default function JobDetailScreen() {
   const [remark, setRemark] = useState('');
   const [paymentMode, setPaymentMode] = useState<'cash' | 'upi' | 'online' | 'pending'>('cash');
   const [paymentUpdating, setPaymentUpdating] = useState(false);
-
-  // ... (pickImage function to be added next via full implementation if needed, checking existing imports)
+  const [photoLoadError, setPhotoLoadError] = useState(false);
 
 
   useEffect(() => {
@@ -230,8 +229,16 @@ export default function JobDetailScreen() {
               <Text style={{ fontSize: 14, color: '#555', marginBottom: 4 }}>📱 {job.mobileNumber || 'N/A'}</Text>
               <Text style={{ fontSize: 14, color: '#555' }}>🛢 {job.tankSize || 'Unknown Size'} • {job.serviceType || 'N/A'}</Text>
               <Text style={{ fontSize: 14, color: '#555', marginTop: 4 }}>
-                💰 {job.paymentStatus === 'paid' ? 'Paid' : 'Payment pending'} • ₹{job.serviceCharge || 0}
+                💰 {job.paymentStatus === 'paid' ? 'Paid' : 'Payment pending'} • {(job.serviceCharge ?? job.service_charge) > 0 ? `₹${Number(job.serviceCharge ?? job.service_charge).toLocaleString('en-IN')}` : 'Price on request'}
               </Text>
+              <Text style={{ fontSize: 13, color: '#16a34a', marginTop: 2, fontWeight: '600' }}>
+                👷 {job.status === 'completed' ? 'Incentive earned' : 'Incentive on completion'}: ₹{(Number(job.incentivePerJob ?? job.incentive_per_job) || 0).toLocaleString('en-IN')}
+              </Text>
+              {job.scheduledAt && (
+                <Text style={{ fontSize: 13, color: '#555', marginTop: 4 }}>
+                  🗓 Scheduled: {new Date(job.scheduledAt).toLocaleString('en-IN')}
+                </Text>
+              )}
             </View>
           </View>
         </View>
@@ -339,24 +346,31 @@ export default function JobDetailScreen() {
           </View>
         </View>
 
-        {job.completionPhoto && (
+        {(job.completionPhoto || job.completion_photo) && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Completion Photo</Text>
             <View style={styles.infoCard}>
-              <Image
-                source={{ uri: `${getUploadsBaseUrl()}/uploads/${job.completionPhoto}` }}
-                style={styles.completionImage}
-                resizeMode="cover"
-              />
+              {photoLoadError ? (
+                <View style={[styles.completionImage, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
+                  <Text style={{ fontSize: 14, color: '#666' }}>📷 Photo unavailable</Text>
+                </View>
+              ) : (
+                <Image
+                  source={{ uri: `${getUploadsBaseUrl()}/uploads/${job.completionPhoto || job.completion_photo}` }}
+                  style={styles.completionImage}
+                  resizeMode="cover"
+                  onError={() => setPhotoLoadError(true)}
+                />
+              )}
               <View style={styles.completionMeta}>
-                {job.completionPhotoAt && (
+                {(job.completionPhotoAt || job.completion_photo_at) && (
                   <Text style={styles.completionMetaText}>
-                    📅 {new Date(job.completionPhotoAt).toLocaleDateString()} • {new Date(job.completionPhotoAt).toLocaleTimeString()}
+                    📅 {new Date(job.completionPhotoAt || job.completion_photo_at).toLocaleDateString()} • {new Date(job.completionPhotoAt || job.completion_photo_at).toLocaleTimeString()}
                   </Text>
                 )}
-                {(job.completionLatitude != null && job.completionLongitude != null) && (
+                {((job.completionLatitude != null) || (job.completion_latitude != null)) && ((job.completionLongitude != null) || (job.completion_longitude != null)) && (
                   <Text style={styles.completionMetaText}>
-                    📍 {Number(job.completionLatitude).toFixed(6)}, {Number(job.completionLongitude).toFixed(6)}
+                    📍 {Number(job.completionLatitude ?? job.completion_latitude).toFixed(6)}, {Number(job.completionLongitude ?? job.completion_longitude).toFixed(6)}
                   </Text>
                 )}
               </View>
@@ -370,7 +384,7 @@ export default function JobDetailScreen() {
       {/* Action Area */}
       {job.status === 'in_progress' && (
         <View style={styles.bottomActions}>
-          {!job.completionPhoto ? (
+          {!(job.completionPhoto || job.completion_photo) ? (
             <TouchableOpacity
               style={[styles.startButton, { backgroundColor: '#FF9500' }]}
               onPress={pickImage}

@@ -122,14 +122,16 @@ export default function ReportsScreen() {
           </View>
         </View>
 
-        {/* Staff wise revenue */}
+        {/* Staff wise revenue & incentive */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Staff wise revenue</Text>
+          <Text style={styles.sectionTitle}>Staff wise revenue & incentive</Text>
           {reports?.staffWise?.length ? (
             reports.staffWise.map((s: any) => (
-              <View key={s._id} style={styles.listRow}>
-                <Text style={styles.listLeft}>Staff: {String(s._id).slice(-4)}</Text>
-                <Text style={styles.listRight}>₹{s.revenue || 0} · {s.jobs} jobs</Text>
+              <View key={String(s._id)} style={styles.listRow}>
+                <Text style={styles.listLeft}>{s.staffName || `Staff ${String(s._id).slice(-4)}`}</Text>
+                <Text style={styles.listRight}>
+                  ₹{(s.revenue ?? 0).toLocaleString('en-IN')} revenue · ₹{(s.incentive ?? 0).toLocaleString('en-IN')} incentive · {s.jobs} jobs
+                </Text>
               </View>
             ))
           ) : (
@@ -147,7 +149,7 @@ export default function ReportsScreen() {
                   <Text style={styles.listLeft}>{p.customerName}</Text>
                   <Text style={styles.subLine}>📱 {p.mobileNumber || 'N/A'}</Text>
                 </View>
-                <Text style={styles.listRight}>₹{p.serviceCharge || 0}</Text>
+                <Text style={styles.listRight}>{(p.serviceCharge ?? p.service_charge) > 0 ? `₹${Number(p.serviceCharge ?? p.service_charge).toLocaleString('en-IN')}` : 'Price on request'}</Text>
               </View>
             ))
           ) : (

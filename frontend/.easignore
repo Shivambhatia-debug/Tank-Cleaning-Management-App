@@ -1,0 +1,5 @@
+# EAS builds run prebuild in cloud - don't upload local native folders
+android/
+ios/
+*.lock
+.gradle/
