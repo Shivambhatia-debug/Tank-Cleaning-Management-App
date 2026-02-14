@@ -814,7 +814,7 @@ app.get('/api/jobs', auth, async (req, res) => {
 
 app.get('/api/jobs/:id', auth, async (req, res) => {
     try {
-        const job = await Job.findById(req.params.id).populate('assignedStaff', 'name phone lastLatitude lastLongitude lastLocationTime');
+        const job = await Job.findById(req.params.id).populate('assignedStaff', 'name phone lastLatitude lastLongitude lastLocationTime perTankIncentive defaultPerJobIncentive defaultFuelExpense defaultChemicalExpense');
         if (!job) return res.status(404).json({ message: 'Job not found' });
         res.json(job);
     } catch (err) {

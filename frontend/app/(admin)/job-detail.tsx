@@ -177,6 +177,14 @@ export default function AdminJobDetailScreen() {
   const profit = charge - totalExpense - incentive;
   const paymentStatus = job.paymentStatus === 'paid' ? 'Paid' : 'Pending';
   const paymentMode = (job.paymentMode || job.payment_mode || '—').toUpperCase();
+  const tankCount = Number(job.tankCount ?? 1);
+  const firstStaff = staffList && staffList.length > 0 ? staffList[0] : null;
+  const perTank = Number(firstStaff?.perTankIncentive ?? firstStaff?.per_tank_incentive ?? 0);
+  const perJob = Number(firstStaff?.defaultPerJobIncentive ?? firstStaff?.default_per_job_incentive ?? 0);
+  const staffFuel = Number(firstStaff?.defaultFuelExpense ?? firstStaff?.default_fuel_expense ?? 0);
+  const staffChemical = Number(firstStaff?.defaultChemicalExpense ?? firstStaff?.default_chemical_expense ?? 0);
+  const tankPart = tankCount * perTank;
+  const incentiveBreakdown = tankPart + perJob;
 
   // Progress tracking
   let progressStep = 'Pending';
@@ -301,11 +309,51 @@ export default function AdminJobDetailScreen() {
             icon="💰"
           />
           <InfoRow label="Payment Mode" value={paymentMode} icon="🏦" />
-          <InfoRow
-            label="Incentive / Job"
-            value={incentive > 0 ? `₹${incentive.toLocaleString('en-IN')}` : '—'}
-            icon="🎁"
-          />
+          <InfoRow label="Scheduled Date" value={job.scheduledAt ? new Date(job.scheduledAt).toLocaleString('en-IN') : 'Not scheduled'} icon="🗓" />
+          <InfoRow label="No. of Tanks" value={String(tankCount)} icon="🛢" />
+          <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#e2e8f0' }}>
+            <Text style={[styles.sectionTitle, { fontSize: 11, marginBottom: 6 }]}>INCENTIVE BREAKDOWN</Text>
+            <InfoRow label="Per tank incentive" value={perTank >= 0 ? `₹${perTank.toLocaleString('en-IN')}` : '—'} icon="🛢" />
+            <InfoRow label="Per job incentive" value={perJob >= 0 ? `₹${perJob.toLocaleString('en-IN')}` : '—'} icon="🎁" />
+            {tankCount > 0 && perTank > 0 && (
+              <InfoRow
+                label="Calculation"
+                value={`${tankCount} × ₹${perTank} + ₹${perJob} = ₹${incentiveBreakdown.toLocaleString('en-IN')}`}
+                icon="🧮"
+              />
+            )}
+            <InfoRow
+              label="Total Incentive / Job"
+              value={incentive > 0 ? `₹${incentive.toLocaleString('en-IN')}` : '—'}
+              icon="🎁"
+            />
+          </View>
+          <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#e2e8f0' }}>
+            <Text style={[styles.sectionTitle, { fontSize: 11, marginBottom: 6 }]}>EXPENSE (staff defaults)</Text>
+            <InfoRow label="Fuel (per job)" value={staffFuel >= 0 ? `₹${staffFuel.toLocaleString('en-IN')}` : '—'} icon="⛽" />
+            <InfoRow label="Chemical" value={staffChemical >= 0 ? `₹${staffChemical.toLocaleString('en-IN')}` : '—'} icon="🧪" />
+            {(job.jobExpenses?.fuelCost > 0 || job.jobExpenses?.chemicalCost > 0) && (
+              <>
+                <Text style={[styles.sectionTitle, { fontSize: 11, marginTop: 8, marginBottom: 4 }]}>ACTUAL EXPENSE (on job)</Text>
+                <InfoRow label="Fuel" value={job.jobExpenses?.fuelCost > 0 ? `₹${job.jobExpenses.fuelCost.toLocaleString('en-IN')}` : '—'} icon="⛽" />
+                <InfoRow label="Chemical" value={job.jobExpenses?.chemicalCost > 0 ? `₹${job.jobExpenses.chemicalCost.toLocaleString('en-IN')}` : '—'} icon="🧪" />
+              </>
+            )}
+          </View>
+          <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: 2, borderTopColor: '#cbd5e1' }}>
+            {(() => {
+              const fuelAmt = (job.jobExpenses?.fuelCost != null && job.jobExpenses.fuelCost > 0) ? job.jobExpenses.fuelCost : staffFuel;
+              const chemAmt = (job.jobExpenses?.chemicalCost != null && job.jobExpenses.chemicalCost > 0) ? job.jobExpenses.chemicalCost : staffChemical;
+              const totalAll = incentive + fuelAmt + chemAmt;
+              return (
+                <InfoRow
+                  label="Total (Incentive + Fuel + Chemical)"
+                  value={totalAll >= 0 ? `₹${totalAll.toLocaleString('en-IN')}` : '—'}
+                  icon="📊"
+                />
+              );
+            })()}
+          </View>
         </View>
 
         {/* -------- Job Expenses & Profit -------- */}

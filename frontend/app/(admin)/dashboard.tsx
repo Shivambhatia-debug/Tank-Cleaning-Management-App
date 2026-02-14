@@ -102,7 +102,7 @@ export default function DashboardScreen() {
       >
         <View style={styles.statsContainer}>
           <View style={styles.statsGrid}>
-            <View style={[styles.statCard, styles.primaryCard]}>
+            <View style={styles.statCard}>
               <View style={styles.statIcon}>
                 <Text style={styles.iconText}>💼</Text>
               </View>
@@ -112,7 +112,7 @@ export default function DashboardScreen() {
               </View>
             </View>
 
-            <View style={[styles.statCard, styles.warningCard]}>
+            <View style={styles.statCard}>
               <View style={styles.statIcon}>
                 <Text style={styles.iconText}>⏳</Text>
               </View>
@@ -122,7 +122,7 @@ export default function DashboardScreen() {
               </View>
             </View>
 
-            <View style={[styles.statCard, { borderLeftColor: '#f59e0b', borderLeftWidth: 4 }]}>
+            <View style={styles.statCard}>
               <View style={styles.statIcon}>
                 <Text style={styles.iconText}>🚗</Text>
               </View>
@@ -132,7 +132,7 @@ export default function DashboardScreen() {
               </View>
             </View>
 
-            <View style={[styles.statCard, styles.successCard]}>
+            <View style={styles.statCard}>
               <View style={styles.statIcon}>
                 <Text style={styles.iconText}>🔄</Text>
               </View>
@@ -142,7 +142,7 @@ export default function DashboardScreen() {
               </View>
             </View>
 
-            <View style={[styles.statCard, styles.infoCard]}>
+            <View style={styles.statCard}>
               <View style={styles.statIcon}>
                 <Text style={styles.iconText}>👷</Text>
               </View>
@@ -152,7 +152,7 @@ export default function DashboardScreen() {
               </View>
             </View>
 
-            <View style={[styles.statCard, { borderLeftColor: '#16a34a', borderLeftWidth: 4 }]}>
+            <View style={styles.statCard}>
               <View style={styles.statIcon}>
                 <Text style={styles.iconText}>💰</Text>
               </View>
@@ -162,7 +162,7 @@ export default function DashboardScreen() {
               </View>
             </View>
 
-            <View style={[styles.statCard, { borderLeftColor: '#dc2626', borderLeftWidth: 4 }]}>
+            <View style={styles.statCard}>
               <View style={styles.statIcon}>
                 <Text style={styles.iconText}>🧾</Text>
               </View>
@@ -172,7 +172,7 @@ export default function DashboardScreen() {
               </View>
             </View>
 
-            <View style={[styles.statCard, { borderLeftColor: '#0EA5E9', borderLeftWidth: 4 }]}>
+            <View style={styles.statCard}>
               <View style={styles.statIcon}>
                 <Text style={styles.iconText}>📈</Text>
               </View>
@@ -423,36 +423,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 12,
     borderRadius: 12,
+    backgroundColor: '#94a3b8',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
     elevation: 2,
-  },
-  primaryCard: {
-    backgroundColor: '#0EA5E9',
-  },
-  warningCard: {
-    backgroundColor: '#FF9500',
-  },
-  successCard: {
-    backgroundColor: '#34C759',
-  },
-  infoCard: {
-    backgroundColor: '#5856D6',
   },
   statIcon: {
     width: isSmallDevice ? 36 : 40,
     height: isSmallDevice ? 36 : 40,
     borderRadius: isSmallDevice ? 18 : 20,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: 'rgba(0,0,0,0.15)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
   },
   iconText: {
     fontSize: isSmallDevice ? 18 : 20,
-    color: '#000',
+    color: '#fff',
   },
   statContent: {
     flex: 1,
@@ -466,9 +455,8 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 11,
-    color: '#fff',
+    color: 'rgba(255,255,255,0.9)',
     marginTop: 1,
-    opacity: 0.9,
     fontFamily: FONT_REGULAR,
   },
   section: {

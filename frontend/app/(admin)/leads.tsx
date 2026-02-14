@@ -75,6 +75,7 @@ type Lead = {
 };
 
 const STATUS_OPTIONS = ['All', 'New', 'Follow-up', 'Confirmed', 'Cancelled', 'Converted'] as const;
+const LEAD_STATUS_EDIT_OPTIONS = ['New', 'Follow-up', 'Confirmed', 'Cancelled', 'Converted'];
 
 export default function LeadsScreen() {
   const { user } = useAuth();
@@ -272,6 +273,8 @@ export default function LeadsScreen() {
         finalPrice: (d as any).finalPrice != null ? String((d as any).finalPrice) : '',
         bookingDate: (d as any).bookingDate ? (typeof (d as any).bookingDate === 'string' ? (d as any).bookingDate.slice(0, 10) : new Date((d as any).bookingDate).toISOString().slice(0, 10)) : '',
         timeSlot: (d as any).timeSlot || '',
+        status: (d as any).status || 'New',
+        jobStatus: (d as any).jobStatus || 'New Lead',
         paymentStatus: (d as any).paymentStatus || 'Pending',
         paymentMode: (d as any).paymentMode || 'pending',
         notes: (d as any).notes || '',
@@ -358,13 +361,16 @@ export default function LeadsScreen() {
         finalPrice: editLeadForm.finalPrice ? Number(editLeadForm.finalPrice) || 0 : undefined,
         bookingDate: editLeadForm.bookingDate || undefined,
         timeSlot: (editLeadForm.timeSlot || '').trim() || undefined,
-        jobStatus: detailJobStatus,
-        paymentStatus: detailPaymentStatus,
+        status: (editLeadForm.status || 'New').trim(),
+        jobStatus: (editLeadForm.jobStatus || 'New Lead').trim(),
+        paymentStatus: (editLeadForm.paymentStatus || 'Pending').trim(),
         paymentMode: (editLeadForm.paymentMode || 'pending').trim(),
         notes: (editLeadForm.notes || '').trim() || undefined,
       };
       const res = await api.put<Lead>(`/leads/${selectedLead._id}`, payload);
       setSelectedLead(res.data);
+      setDetailJobStatus((res.data.jobStatus as any) || 'New Lead');
+      setDetailPaymentStatus((res.data.paymentStatus as any) || 'Pending');
       setEditLeadMode(false);
       loadLeads();
       Alert.alert('Saved', 'Lead details updated.');
@@ -946,8 +952,13 @@ export default function LeadsScreen() {
                     <TextInput style={styles.input} placeholder="Full name" placeholderTextColor="#9CA3AF" value={editLeadForm.customerName} onChangeText={(t) => setEditLeadForm({ ...editLeadForm, customerName: t })} />
                     <Text style={styles.label}>Mobile *</Text>
                     <TextInput style={styles.input} placeholder="10 digit" placeholderTextColor="#9CA3AF" keyboardType="phone-pad" maxLength={10} value={editLeadForm.mobileNumber} onChangeText={(t) => setEditLeadForm({ ...editLeadForm, mobileNumber: t.replace(/\D/g, '').slice(0, 10) })} />
+                    <Text style={styles.label}>WhatsApp number</Text>
+                    <TextInput style={styles.input} placeholder="10 digit" placeholderTextColor="#9CA3AF" keyboardType="phone-pad" maxLength={10} value={editLeadForm.whatsappNumber} onChangeText={(t) => setEditLeadForm({ ...editLeadForm, whatsappNumber: t.replace(/\D/g, '').slice(0, 10) })} />
                     <Text style={styles.label}>Address</Text>
                     <TextInput style={[styles.input, styles.textArea]} placeholder="Address" placeholderTextColor="#9CA3AF" multiline numberOfLines={2} value={editLeadForm.address} onChangeText={(t) => setEditLeadForm({ ...editLeadForm, address: t })} />
+                    <DropdownPicker label="Source" placeholder="Select" value={editLeadForm.source} options={SOURCE_OPTIONS} onSelect={(v) => setEditLeadForm({ ...editLeadForm, source: v })} />
+                    <Text style={styles.label}>Area</Text>
+                    <TextInput style={styles.input} placeholder="Area" placeholderTextColor="#9CA3AF" value={editLeadForm.area} onChangeText={(t) => setEditLeadForm({ ...editLeadForm, area: t })} />
                     <View style={styles.row2}>
                       <View style={styles.col2}>
                         <Text style={styles.label}>Quoted (₹)</Text>
@@ -967,9 +978,23 @@ export default function LeadsScreen() {
                       </View>
                       <View style={styles.spacer2} />
                       <View style={styles.col2}>
-                        <CalendarPicker label="Booking date" placeholder="Date" value={editLeadForm.bookingDate} onChange={(d) => setEditLeadForm({ ...editLeadForm, bookingDate: d })} small />
+                        <Text style={styles.label}>Number of tanks</Text>
+                        <TextInput style={styles.input} placeholder="e.g. 2" placeholderTextColor="#9CA3AF" keyboardType="numeric" value={editLeadForm.numberOfTanks} onChangeText={(t) => setEditLeadForm({ ...editLeadForm, numberOfTanks: t })} />
                       </View>
                     </View>
+                    <View style={styles.row2}>
+                      <View style={styles.col2}>
+                        <CalendarPicker label="Booking date" placeholder="Date" value={editLeadForm.bookingDate} onChange={(d) => setEditLeadForm({ ...editLeadForm, bookingDate: d })} small />
+                      </View>
+                      <View style={styles.spacer2} />
+                      <View style={styles.col2}>
+                        <DropdownPicker label="Time slot" placeholder="Select" value={editLeadForm.timeSlot} options={TIME_SLOT_OPTIONS} onSelect={(v) => setEditLeadForm({ ...editLeadForm, timeSlot: v })} />
+                      </View>
+                    </View>
+                    <DropdownPicker label="Lead status" placeholder="Select" value={editLeadForm.status} options={LEAD_STATUS_EDIT_OPTIONS} onSelect={(v) => setEditLeadForm({ ...editLeadForm, status: v })} />
+                    <DropdownPicker label="Job status" placeholder="Select" value={editLeadForm.jobStatus} options={[...JOB_STATUS_OPTIONS]} onSelect={(v) => setEditLeadForm({ ...editLeadForm, jobStatus: v })} />
+                    <DropdownPicker label="Payment status" placeholder="Select" value={editLeadForm.paymentStatus} options={[...PAYMENT_STATUS_OPTIONS]} onSelect={(v) => setEditLeadForm({ ...editLeadForm, paymentStatus: v })} />
+                    <DropdownPicker label="Payment mode" placeholder="Select" value={editLeadForm.paymentMode} options={PAYMENT_MODE_OPTIONS} onSelect={(v) => setEditLeadForm({ ...editLeadForm, paymentMode: v })} />
                     <Text style={styles.label}>Notes</Text>
                     <TextInput style={[styles.input, styles.textArea]} placeholder="Notes" placeholderTextColor="#9CA3AF" multiline numberOfLines={2} value={editLeadForm.notes} onChangeText={(t) => setEditLeadForm({ ...editLeadForm, notes: t })} />
                     <TouchableOpacity style={[styles.modalBtn, styles.modalBtnPrimary]} onPress={handleSaveEditLead} disabled={savingEdit}>

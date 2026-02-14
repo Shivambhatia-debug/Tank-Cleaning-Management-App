@@ -386,7 +386,7 @@ export default function StaffManagementScreen() {
                   <Text style={styles.label}>Default fuel expense per job (₹)</Text>
                   <TextInput
                     style={styles.input}
-                    placeholder="e.g. 150"
+                    placeholder="e.g. 50"
                     placeholderTextColor="#9CA3AF"
                     keyboardType="numeric"
                     value={newStaff.defaultFuelExpense}
@@ -398,7 +398,7 @@ export default function StaffManagementScreen() {
                   <Text style={styles.label}>Default chemical expense (₹)</Text>
                   <TextInput
                     style={styles.input}
-                    placeholder="e.g. 100"
+                    placeholder="e.g. 30"
                     placeholderTextColor="#9CA3AF"
                     keyboardType="numeric"
                     value={newStaff.defaultChemicalExpense}
@@ -406,7 +406,6 @@ export default function StaffManagementScreen() {
                   />
                 </View>
               </View>
-
               <View style={styles.row}>
                 <View style={styles.col}>
                   <Text style={styles.label}>Bike</Text>
@@ -430,10 +429,10 @@ export default function StaffManagementScreen() {
                 </View>
                 <View style={{ width: 10 }} />
                 <View style={styles.col}>
-                  <Text style={styles.label}>Fuel Allowance (₹)</Text>
+                  <Text style={styles.label}>Fuel allowance (₹)</Text>
                   <TextInput
                     style={styles.input}
-                    placeholder="e.g. 1500"
+                    placeholder="e.g. 200"
                     placeholderTextColor="#9CA3AF"
                     keyboardType="numeric"
                     value={newStaff.fuelAllowance}
@@ -556,26 +555,40 @@ export default function StaffManagementScreen() {
                   <View style={styles.staffDetailInfoRow}><Text style={styles.staffDetailInfoLabel}>Default Per Job Incentive</Text><Text style={styles.staffDetailInfoValue}>{formatCurrencyOrDash(selectedStaff.defaultPerJobIncentive)}</Text></View>
                   <View style={styles.staffDetailInfoRow}><Text style={styles.staffDetailInfoLabel}>Default Fuel Expense (per job)</Text><Text style={styles.staffDetailInfoValue}>{formatCurrencyOrDash(selectedStaff.defaultFuelExpense)}</Text></View>
                   <View style={styles.staffDetailInfoRow}><Text style={styles.staffDetailInfoLabel}>Default Chemical Expense</Text><Text style={styles.staffDetailInfoValue}>{formatCurrencyOrDash(selectedStaff.defaultChemicalExpense)}</Text></View>
-                  {selectedStaff.hasBike && (
-                    <View style={styles.staffDetailInfoRow}><Text style={styles.staffDetailInfoLabel}>Fuel Allowance</Text><Text style={styles.staffDetailInfoValue}>{formatCurrencyOrDash(selectedStaff.fuelAllowance)}</Text></View>
-                  )}
+                  <View style={styles.staffDetailInfoRow}><Text style={styles.staffDetailInfoLabel}>Fuel Allowance</Text><Text style={styles.staffDetailInfoValue}>{formatCurrencyOrDash(selectedStaff.fuelAllowance)}</Text></View>
                 </View>
                 {editingStaff ? (
                   <View style={styles.staffDetailCard}>
                     <Text style={styles.staffDetailCardTitle}>EDIT STAFF</Text>
-                    <Text style={styles.label}>Default Fuel Expense (₹)</Text>
-                    <TextInput style={styles.input} placeholder="e.g. 150" placeholderTextColor="#9CA3AF" keyboardType="numeric" value={String(editForm.defaultFuelExpense ?? selectedStaff.defaultFuelExpense ?? '')} onChangeText={(t) => setEditForm({ ...editForm, defaultFuelExpense: t })} />
+                    <Text style={styles.label}>Per Tank Incentive (₹)</Text>
+                    <TextInput style={styles.input} placeholder="e.g. 100" placeholderTextColor="#9CA3AF" keyboardType="numeric" value={String(editForm.perTankIncentive ?? selectedStaff.perTankIncentive ?? '')} onChangeText={(t) => setEditForm({ ...editForm, perTankIncentive: t })} />
+                    <Text style={[styles.label, { marginTop: 8 }]}>Default Per Job Incentive (₹)</Text>
+                    <TextInput style={styles.input} placeholder="e.g. 50" placeholderTextColor="#9CA3AF" keyboardType="numeric" value={String(editForm.defaultPerJobIncentive ?? selectedStaff.defaultPerJobIncentive ?? '')} onChangeText={(t) => setEditForm({ ...editForm, defaultPerJobIncentive: t })} />
+                    <Text style={[styles.label, { marginTop: 8 }]}>Default Fuel Expense (₹)</Text>
+                    <TextInput style={styles.input} placeholder="e.g. 50" placeholderTextColor="#9CA3AF" keyboardType="numeric" value={String(editForm.defaultFuelExpense ?? selectedStaff.defaultFuelExpense ?? '')} onChangeText={(t) => setEditForm({ ...editForm, defaultFuelExpense: t })} />
                     <Text style={[styles.label, { marginTop: 8 }]}>Default Chemical Expense (₹)</Text>
-                    <TextInput style={styles.input} placeholder="e.g. 100" placeholderTextColor="#9CA3AF" keyboardType="numeric" value={String(editForm.defaultChemicalExpense ?? selectedStaff.defaultChemicalExpense ?? '')} onChangeText={(t) => setEditForm({ ...editForm, defaultChemicalExpense: t })} />
+                    <TextInput style={styles.input} placeholder="e.g. 30" placeholderTextColor="#9CA3AF" keyboardType="numeric" value={String(editForm.defaultChemicalExpense ?? selectedStaff.defaultChemicalExpense ?? '')} onChangeText={(t) => setEditForm({ ...editForm, defaultChemicalExpense: t })} />
+                    <Text style={[styles.label, { marginTop: 8 }]}>Fuel Allowance (₹)</Text>
+                    <TextInput style={styles.input} placeholder="e.g. 200" placeholderTextColor="#9CA3AF" keyboardType="numeric" value={String(editForm.fuelAllowance ?? selectedStaff.fuelAllowance ?? '')} onChangeText={(t) => setEditForm({ ...editForm, fuelAllowance: t })} />
                     <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
                       <TouchableOpacity style={[styles.modalBtn, { flex: 1, backgroundColor: '#0EA5E9' }]} onPress={async () => {
                         try {
                           await api.put(`/users/${selectedStaff._id}`, {
-                            defaultFuelExpense: Number(editForm.defaultFuelExpense ?? selectedStaff.defaultFuelExpense) || 0,
-                            defaultChemicalExpense: Number(editForm.defaultChemicalExpense ?? selectedStaff.defaultChemicalExpense) || 0,
+                            perTankIncentive: Number(editForm.perTankIncentive ?? selectedStaff.perTankIncentive) || 0,
+                            defaultPerJobIncentive: Number(editForm.defaultPerJobIncentive ?? selectedStaff.defaultPerJobIncentive) || 0,
+                            defaultFuelExpense: editForm.defaultFuelExpense !== undefined ? Number(editForm.defaultFuelExpense) || 0 : undefined,
+                            defaultChemicalExpense: editForm.defaultChemicalExpense !== undefined ? Number(editForm.defaultChemicalExpense) || 0 : undefined,
+                            fuelAllowance: editForm.fuelAllowance !== undefined ? Number(editForm.fuelAllowance) || 0 : undefined,
                           });
                           setEditingStaff(false);
-                          setSelectedStaff({ ...selectedStaff, defaultFuelExpense: Number(editForm.defaultFuelExpense ?? selectedStaff.defaultFuelExpense) || 0, defaultChemicalExpense: Number(editForm.defaultChemicalExpense ?? selectedStaff.defaultChemicalExpense) || 0 });
+                          setSelectedStaff({
+                            ...selectedStaff,
+                            perTankIncentive: Number(editForm.perTankIncentive ?? selectedStaff.perTankIncentive) || 0,
+                            defaultPerJobIncentive: Number(editForm.defaultPerJobIncentive ?? selectedStaff.defaultPerJobIncentive) || 0,
+                            defaultFuelExpense: editForm.defaultFuelExpense !== undefined ? Number(editForm.defaultFuelExpense) : selectedStaff.defaultFuelExpense,
+                            defaultChemicalExpense: editForm.defaultChemicalExpense !== undefined ? Number(editForm.defaultChemicalExpense) : selectedStaff.defaultChemicalExpense,
+                            fuelAllowance: editForm.fuelAllowance !== undefined ? Number(editForm.fuelAllowance) : selectedStaff.fuelAllowance,
+                          });
                           loadStaff();
                         } catch (e: any) {
                           Alert.alert('Error', e.response?.data?.message || 'Failed to update');
@@ -590,7 +603,7 @@ export default function StaffManagementScreen() {
                   </View>
                 ) : (
                   <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#e0f2fe', marginBottom: 12 }]} onPress={() => { setEditingStaff(true); setEditForm({}); }}>
-                    <Text style={[styles.modalBtnPrimaryText, { color: '#0284c7' }]}>Edit staff (expense & compensation)</Text>
+                    <Text style={[styles.modalBtnPrimaryText, { color: '#0284c7' }]}>Edit staff (incentive & expense)</Text>
                   </TouchableOpacity>
                 )}
 
