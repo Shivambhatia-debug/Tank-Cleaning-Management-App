@@ -213,6 +213,7 @@ app.post('/api/users/staff', auth, async (req, res) => {
             staffType,
             fixedSalary,
             perTankIncentive,
+            defaultPerJobIncentive,
             hasBike,
             fuelAllowance,
             joiningDate,
@@ -238,6 +239,7 @@ app.post('/api/users/staff', auth, async (req, res) => {
         }
         if (fixedSalary != null) staffData.fixedSalary = Number(fixedSalary) || 0;
         if (perTankIncentive != null) staffData.perTankIncentive = Number(perTankIncentive) || 0;
+        if (defaultPerJobIncentive != null) staffData.defaultPerJobIncentive = Number(defaultPerJobIncentive) || 0;
         if (typeof hasBike === 'boolean') staffData.hasBike = hasBike;
         if (fuelAllowance != null) staffData.fuelAllowance = Number(fuelAllowance) || 0;
         if (joiningDate) staffData.joiningDate = new Date(joiningDate);
@@ -492,6 +494,7 @@ app.put('/api/users/:id', auth, async (req, res) => {
             staffType,
             fixedSalary,
             perTankIncentive,
+            defaultPerJobIncentive,
             hasBike,
             fuelAllowance,
             joiningDate,
@@ -507,6 +510,7 @@ app.put('/api/users/:id', auth, async (req, res) => {
         if (staffType && ['Full Time', 'Part Time'].includes(staffType)) updates.staffType = staffType;
         if (fixedSalary != null) updates.fixedSalary = Number(fixedSalary) || 0;
         if (perTankIncentive != null) updates.perTankIncentive = Number(perTankIncentive) || 0;
+        if (defaultPerJobIncentive != null) updates.defaultPerJobIncentive = Number(defaultPerJobIncentive) || 0;
         if (typeof hasBike === 'boolean') updates.hasBike = hasBike;
         if (fuelAllowance != null) updates.fuelAllowance = Number(fuelAllowance) || 0;
         if (joiningDate) updates.joiningDate = new Date(joiningDate);

@@ -15,6 +15,7 @@ import {
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker } from 'react-native-maps';
 import api, { getUploadsBaseUrl } from '../../utils/api';
@@ -55,6 +56,7 @@ function CompletionPhotoImage({ filename, getUploadsBaseUrl, style }: { filename
 }
 
 export default function JobsManagementScreen() {
+  const router = useRouter();
   const [jobs, setJobs] = useState<any[]>([]);
   const [staff, setStaff] = useState<any[]>([]);
   const [services, setServices] = useState<{ name: string; startingPrice: number | null }[]>([]);
@@ -77,7 +79,7 @@ export default function JobsManagementScreen() {
     lead_source: 'Call',
     service_charge: '',
     scheduled_at: '',
-    incentive_per_job: '',
+    incentive_per_job: '20',
     payment_mode: 'pending',
   });
 
@@ -305,9 +307,27 @@ export default function JobsManagementScreen() {
       )}
 
       <View style={styles.jobFooter}>
-        <Text style={styles.assignedCount}>
-          Assigned to {item.assignedStaff?.length || 0} staff
-        </Text>
+        <Text style={styles.assignedLabel}>Assigned to: </Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+          {(item.assignedStaff && item.assignedStaff.length > 0)
+            ? item.assignedStaff.map((s: any) => {
+                const staffId = s._id || s;
+                const staffName = typeof s === 'object' && s.name ? s.name : (staff.find((st: any) => st._id === staffId)?.name) || `Staff ${String(staffId).slice(-4)}`;
+                return (
+                  <TouchableOpacity
+                    key={staffId}
+                    style={styles.staffChip}
+                    onPress={() => router.push({ pathname: '/(admin)/staff', params: { openStaffId: staffId } })}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.staffChipText}>{staffName}</Text>
+                    <Ionicons name="open-outline" size={14} color="#007AFF" />
+                  </TouchableOpacity>
+                );
+              })
+            : <Text style={styles.assignedCount}>No staff assigned</Text>
+          }
+        </View>
       </View>
     </View>
   );
@@ -739,10 +759,32 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   jobFooter: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#e2e8f0',
     paddingTop: 8,
     marginTop: 8,
+    gap: 4,
+  },
+  assignedLabel: {
+    fontSize: 12,
+    color: '#8E8E93',
+  },
+  staffChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: '#E8F4FD',
+    borderRadius: 8,
+  },
+  staffChipText: {
+    fontSize: 12,
+    color: '#007AFF',
+    fontWeight: '500',
   },
   completionThumb: {
     width: '100%',

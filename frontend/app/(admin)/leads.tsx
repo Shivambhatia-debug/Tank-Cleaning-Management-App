@@ -352,6 +352,7 @@ export default function LeadsScreen() {
         serviceType: 'Water Tank',
         leadSource: selectedLead.source || 'Lead',
         serviceCharge: 0,
+        incentivePerJob: 20,
         paymentMode: 'pending',
         assignedStaff: selectedJobStaffIds,
         notes: `Job created from lead ${selectedLead._id}`,

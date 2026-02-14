@@ -34,6 +34,7 @@ const userSchema = new mongoose.Schema({
     },
     fixedSalary: { type: Number },
     perTankIncentive: { type: Number },
+    defaultPerJobIncentive: { type: Number },
     hasBike: { type: Boolean, default: false },
     fuelAllowance: { type: Number },
     joiningDate: { type: Date },

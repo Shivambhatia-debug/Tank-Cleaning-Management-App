@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useLocalSearchParams } from 'expo-router';
 import {
   View,
   Text,
@@ -11,9 +12,10 @@ import {
   Modal,
   Alert,
   ScrollView,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import api from '../../utils/api';
+import api, { getUploadsBaseUrl } from '../../utils/api';
 import BrandText from '../../components/BrandText';
 import CalendarPicker from '../../components/CalendarPicker';
 
@@ -21,6 +23,7 @@ const STAFF_TYPE_OPTIONS = ['Full Time', 'Part Time'] as const;
 const STAFF_STATUS_OPTIONS = ['Active', 'Inactive', 'Terminated'] as const;
 
 export default function StaffManagementScreen() {
+  const { openStaffId } = useLocalSearchParams<{ openStaffId?: string }>();
   const [staff, setStaff] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -37,6 +40,7 @@ export default function StaffManagementScreen() {
     staffType: 'Full Time' as (typeof STAFF_TYPE_OPTIONS)[number],
     fixedSalary: '',
     perTankIncentive: '',
+    defaultPerJobIncentive: '',
     hasBike: false,
     fuelAllowance: '',
     joiningDate: '',
@@ -46,10 +50,22 @@ export default function StaffManagementScreen() {
   const [addingStaff, setAddingStaff] = useState(false);
   const [staffStats, setStaffStats] = useState<any | null>(null);
   const [loadingStats, setLoadingStats] = useState(false);
+  const [staffJobs, setStaffJobs] = useState<any[]>([]);
 
   useEffect(() => {
     loadStaff();
   }, []);
+
+  useEffect(() => {
+    if (openStaffId && staff.length > 0) {
+      const s = staff.find((x: any) => x._id === openStaffId);
+      if (s) {
+        setSelectedStaff(s);
+        setDetailModalVisible(true);
+        loadStaffStats(s._id);
+      }
+    }
+  }, [openStaffId, staff]);
 
   const loadStaff = async () => {
     try {
@@ -89,6 +105,7 @@ export default function StaffManagementScreen() {
         staffType: newStaff.staffType,
         fixedSalary: newStaff.fixedSalary ? Number(newStaff.fixedSalary) || 0 : undefined,
         perTankIncentive: newStaff.perTankIncentive ? Number(newStaff.perTankIncentive) || 0 : undefined,
+        defaultPerJobIncentive: newStaff.defaultPerJobIncentive ? Number(newStaff.defaultPerJobIncentive) || 0 : undefined,
         hasBike: newStaff.hasBike,
         fuelAllowance: newStaff.fuelAllowance ? Number(newStaff.fuelAllowance) || 0 : undefined,
         joiningDate: newStaff.joiningDate || undefined,
@@ -110,6 +127,7 @@ export default function StaffManagementScreen() {
         staffType: 'Full Time',
         fixedSalary: '',
         perTankIncentive: '',
+        defaultPerJobIncentive: '',
         hasBike: false,
         fuelAllowance: '',
         joiningDate: '',
@@ -162,8 +180,12 @@ export default function StaffManagementScreen() {
   const loadStaffStats = async (staffId: string) => {
     try {
       setLoadingStats(true);
-      const res = await api.get(`/stats/staff/${staffId}`);
-      setStaffStats(res.data);
+      const [statsRes, jobsRes] = await Promise.all([
+        api.get(`/stats/staff/${staffId}`),
+        api.get(`/jobs?staffId=${staffId}`).catch(() => ({ data: [] })),
+      ]);
+      setStaffStats(statsRes.data);
+      setStaffJobs(Array.isArray(jobsRes.data) ? jobsRes.data : []);
     } catch (e) {
       console.error('Staff stats error', e);
     } finally {
@@ -322,6 +344,19 @@ export default function StaffManagementScreen() {
                   />
                 </View>
               </View>
+              <View style={styles.row}>
+                <View style={styles.col}>
+                  <Text style={styles.label}>Default per job incentive (₹)</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g. 20 (suggested when creating jobs)"
+                    placeholderTextColor="#9CA3AF"
+                    keyboardType="numeric"
+                    value={newStaff.defaultPerJobIncentive}
+                    onChangeText={(t) => setNewStaff({ ...newStaff, defaultPerJobIncentive: t })}
+                  />
+                </View>
+              </View>
 
               <View style={styles.row}>
                 <View style={styles.col}>
@@ -457,6 +492,9 @@ export default function StaffManagementScreen() {
                   <Text style={styles.detailRow}><Text style={styles.detailLabel}>Password:</Text> {selectedStaff.plainPasswordForAdmin || '—'}</Text>
                   <Text style={styles.detailRow}><Text style={styles.detailLabel}>Business:</Text> {selectedStaff.businessName || '—'}</Text>
                   <Text style={styles.detailRow}><Text style={styles.detailLabel}>Location:</Text> {selectedStaff.location || '—'}</Text>
+                  {(selectedStaff.defaultPerJobIncentive != null && selectedStaff.defaultPerJobIncentive !== '') && (
+                    <Text style={styles.detailRow}><Text style={styles.detailLabel}>Default per job incentive:</Text> ₹{Number(selectedStaff.defaultPerJobIncentive).toLocaleString('en-IN')}</Text>
+                  )}
                   <View style={[styles.detailBadge, { backgroundColor: selectedStaff.isActive ? '#34C759' : '#FF3B30' }]}>
                     <Text style={styles.detailBadgeText}>{selectedStaff.isActive ? 'Active' : 'Inactive'}</Text>
                   </View>
@@ -480,6 +518,25 @@ export default function StaffManagementScreen() {
                       </>
                     )}
                   </View>
+
+                  {staffJobs.filter((j: any) => j.status === 'completed' && (j.completionPhoto || j.completion_photo)).length > 0 && (
+                    <View style={styles.statsBox}>
+                      <Text style={styles.statsTitle}>📷 Completion photos (from jobs)</Text>
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                        {staffJobs
+                          .filter((j: any) => j.status === 'completed' && (j.completionPhoto || j.completion_photo))
+                          .slice(0, 6)
+                          .map((j: any) => (
+                            <Image
+                              key={j._id}
+                              source={{ uri: `${getUploadsBaseUrl()}/uploads/${j.completionPhoto || j.completion_photo}` }}
+                              style={{ width: 72, height: 72, borderRadius: 8, backgroundColor: '#eee' }}
+                              resizeMode="cover"
+                            />
+                          ))}
+                      </View>
+                    </View>
+                  )}
                 </View>
               )}
               <TouchableOpacity
