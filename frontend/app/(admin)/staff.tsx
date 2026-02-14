@@ -52,6 +52,8 @@ export default function StaffManagementScreen() {
     fixedSalary: '',
     perTankIncentive: '',
     defaultPerJobIncentive: '',
+    defaultFuelExpense: '',
+    defaultChemicalExpense: '',
     hasBike: false,
     fuelAllowance: '',
     joiningDate: '',
@@ -59,6 +61,8 @@ export default function StaffManagementScreen() {
     remarks: '',
   });
   const [addingStaff, setAddingStaff] = useState(false);
+  const [editingStaff, setEditingStaff] = useState(false);
+  const [editForm, setEditForm] = useState<Record<string, string | number>>({});
   const [staffStats, setStaffStats] = useState<any | null>(null);
   const [loadingStats, setLoadingStats] = useState(false);
   const [staffJobs, setStaffJobs] = useState<any[]>([]);
@@ -117,6 +121,8 @@ export default function StaffManagementScreen() {
         fixedSalary: newStaff.fixedSalary ? Number(newStaff.fixedSalary) || 0 : undefined,
         perTankIncentive: newStaff.perTankIncentive ? Number(newStaff.perTankIncentive) || 0 : undefined,
         defaultPerJobIncentive: newStaff.defaultPerJobIncentive ? Number(newStaff.defaultPerJobIncentive) || 0 : undefined,
+        defaultFuelExpense: newStaff.defaultFuelExpense ? Number(newStaff.defaultFuelExpense) || 0 : undefined,
+        defaultChemicalExpense: newStaff.defaultChemicalExpense ? Number(newStaff.defaultChemicalExpense) || 0 : undefined,
         hasBike: newStaff.hasBike,
         fuelAllowance: newStaff.fuelAllowance ? Number(newStaff.fuelAllowance) || 0 : undefined,
         joiningDate: newStaff.joiningDate || undefined,
@@ -139,6 +145,8 @@ export default function StaffManagementScreen() {
         fixedSalary: '',
         perTankIncentive: '',
         defaultPerJobIncentive: '',
+        defaultFuelExpense: '',
+        defaultChemicalExpense: '',
         hasBike: false,
         fuelAllowance: '',
         joiningDate: '',
@@ -373,6 +381,31 @@ export default function StaffManagementScreen() {
                   />
                 </View>
               </View>
+              <View style={styles.row}>
+                <View style={styles.col}>
+                  <Text style={styles.label}>Default fuel expense per job (₹)</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g. 150"
+                    placeholderTextColor="#9CA3AF"
+                    keyboardType="numeric"
+                    value={newStaff.defaultFuelExpense}
+                    onChangeText={(t) => setNewStaff({ ...newStaff, defaultFuelExpense: t })}
+                  />
+                </View>
+                <View style={{ width: 10 }} />
+                <View style={styles.col}>
+                  <Text style={styles.label}>Default chemical expense (₹)</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g. 100"
+                    placeholderTextColor="#9CA3AF"
+                    keyboardType="numeric"
+                    value={newStaff.defaultChemicalExpense}
+                    onChangeText={(t) => setNewStaff({ ...newStaff, defaultChemicalExpense: t })}
+                  />
+                </View>
+              </View>
 
               <View style={styles.row}>
                 <View style={styles.col}>
@@ -489,11 +522,11 @@ export default function StaffManagementScreen() {
       <Modal
         visible={detailModalVisible}
         animationType="slide"
-        onRequestClose={() => setDetailModalVisible(false)}
+        onRequestClose={() => { setDetailModalVisible(false); setEditingStaff(false); }}
       >
         <SafeAreaView style={styles.fullScreenModal}>
           <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setDetailModalVisible(false)} style={styles.modalBackBtn}>
+            <TouchableOpacity onPress={() => { setDetailModalVisible(false); setEditingStaff(false); }} style={styles.modalBackBtn}>
               <Ionicons name="arrow-back" size={24} color="#0f172a" />
             </TouchableOpacity>
             <Text style={styles.modalHeaderTitle}>Staff Details</Text>
@@ -521,10 +554,45 @@ export default function StaffManagementScreen() {
                   <View style={styles.staffDetailInfoRow}><Text style={styles.staffDetailInfoLabel}>Fixed Salary</Text><Text style={styles.staffDetailInfoValue}>{formatCurrencyOrDash(selectedStaff.fixedSalary)}</Text></View>
                   <View style={styles.staffDetailInfoRow}><Text style={styles.staffDetailInfoLabel}>Per Tank Incentive</Text><Text style={styles.staffDetailInfoValue}>{formatCurrencyOrDash(selectedStaff.perTankIncentive)}</Text></View>
                   <View style={styles.staffDetailInfoRow}><Text style={styles.staffDetailInfoLabel}>Default Per Job Incentive</Text><Text style={styles.staffDetailInfoValue}>{formatCurrencyOrDash(selectedStaff.defaultPerJobIncentive)}</Text></View>
+                  <View style={styles.staffDetailInfoRow}><Text style={styles.staffDetailInfoLabel}>Default Fuel Expense (per job)</Text><Text style={styles.staffDetailInfoValue}>{formatCurrencyOrDash(selectedStaff.defaultFuelExpense)}</Text></View>
+                  <View style={styles.staffDetailInfoRow}><Text style={styles.staffDetailInfoLabel}>Default Chemical Expense</Text><Text style={styles.staffDetailInfoValue}>{formatCurrencyOrDash(selectedStaff.defaultChemicalExpense)}</Text></View>
                   {selectedStaff.hasBike && (
                     <View style={styles.staffDetailInfoRow}><Text style={styles.staffDetailInfoLabel}>Fuel Allowance</Text><Text style={styles.staffDetailInfoValue}>{formatCurrencyOrDash(selectedStaff.fuelAllowance)}</Text></View>
                   )}
                 </View>
+                {editingStaff ? (
+                  <View style={styles.staffDetailCard}>
+                    <Text style={styles.staffDetailCardTitle}>EDIT STAFF</Text>
+                    <Text style={styles.label}>Default Fuel Expense (₹)</Text>
+                    <TextInput style={styles.input} placeholder="e.g. 150" placeholderTextColor="#9CA3AF" keyboardType="numeric" value={String(editForm.defaultFuelExpense ?? selectedStaff.defaultFuelExpense ?? '')} onChangeText={(t) => setEditForm({ ...editForm, defaultFuelExpense: t })} />
+                    <Text style={[styles.label, { marginTop: 8 }]}>Default Chemical Expense (₹)</Text>
+                    <TextInput style={styles.input} placeholder="e.g. 100" placeholderTextColor="#9CA3AF" keyboardType="numeric" value={String(editForm.defaultChemicalExpense ?? selectedStaff.defaultChemicalExpense ?? '')} onChangeText={(t) => setEditForm({ ...editForm, defaultChemicalExpense: t })} />
+                    <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
+                      <TouchableOpacity style={[styles.modalBtn, { flex: 1, backgroundColor: '#0EA5E9' }]} onPress={async () => {
+                        try {
+                          await api.put(`/users/${selectedStaff._id}`, {
+                            defaultFuelExpense: Number(editForm.defaultFuelExpense ?? selectedStaff.defaultFuelExpense) || 0,
+                            defaultChemicalExpense: Number(editForm.defaultChemicalExpense ?? selectedStaff.defaultChemicalExpense) || 0,
+                          });
+                          setEditingStaff(false);
+                          setSelectedStaff({ ...selectedStaff, defaultFuelExpense: Number(editForm.defaultFuelExpense ?? selectedStaff.defaultFuelExpense) || 0, defaultChemicalExpense: Number(editForm.defaultChemicalExpense ?? selectedStaff.defaultChemicalExpense) || 0 });
+                          loadStaff();
+                        } catch (e: any) {
+                          Alert.alert('Error', e.response?.data?.message || 'Failed to update');
+                        }
+                      }}>
+                        <Text style={styles.modalBtnPrimaryText}>Save</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={[styles.modalBtn, { flex: 1, backgroundColor: '#94a3b8' }]} onPress={() => { setEditingStaff(false); setEditForm({}); }}>
+                        <Text style={styles.modalBtnPrimaryText}>Cancel</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ) : (
+                  <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#e0f2fe', marginBottom: 12 }]} onPress={() => { setEditingStaff(true); setEditForm({}); }}>
+                    <Text style={[styles.modalBtnPrimaryText, { color: '#0284c7' }]}>Edit staff (expense & compensation)</Text>
+                  </TouchableOpacity>
+                )}
 
                 <View style={styles.staffDetailCard}>
                   <Text style={styles.staffDetailCardTitle}>PERFORMANCE</Text>

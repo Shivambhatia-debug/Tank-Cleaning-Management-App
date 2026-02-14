@@ -242,6 +242,8 @@ app.post('/api/users/staff', auth, async (req, res) => {
             fixedSalary,
             perTankIncentive,
             defaultPerJobIncentive,
+            defaultFuelExpense,
+            defaultChemicalExpense,
             hasBike,
             fuelAllowance,
             joiningDate,
@@ -268,6 +270,8 @@ app.post('/api/users/staff', auth, async (req, res) => {
         if (fixedSalary != null) staffData.fixedSalary = Number(fixedSalary) || 0;
         if (perTankIncentive != null) staffData.perTankIncentive = Number(perTankIncentive) || 0;
         if (defaultPerJobIncentive != null) staffData.defaultPerJobIncentive = Number(defaultPerJobIncentive) || 0;
+        if (defaultFuelExpense != null) staffData.defaultFuelExpense = Number(defaultFuelExpense) || 0;
+        if (defaultChemicalExpense != null) staffData.defaultChemicalExpense = Number(defaultChemicalExpense) || 0;
         if (typeof hasBike === 'boolean') staffData.hasBike = hasBike;
         if (fuelAllowance != null) staffData.fuelAllowance = Number(fuelAllowance) || 0;
         if (employmentStatus && ['Active', 'Inactive', 'Terminated'].includes(employmentStatus)) {
@@ -428,6 +432,7 @@ app.put('/api/leads/:id', auth, async (req, res) => {
             'paymentStatus',
             'paymentMode',
             'notes',
+            'firstJobId',
         ];
 
         for (const key of allowedFields) {
@@ -550,6 +555,8 @@ app.put('/api/users/:id', auth, async (req, res) => {
             fixedSalary,
             perTankIncentive,
             defaultPerJobIncentive,
+            defaultFuelExpense,
+            defaultChemicalExpense,
             hasBike,
             fuelAllowance,
             joiningDate,
@@ -566,6 +573,8 @@ app.put('/api/users/:id', auth, async (req, res) => {
         if (fixedSalary != null) updates.fixedSalary = Number(fixedSalary) || 0;
         if (perTankIncentive != null) updates.perTankIncentive = Number(perTankIncentive) || 0;
         if (defaultPerJobIncentive != null) updates.defaultPerJobIncentive = Number(defaultPerJobIncentive) || 0;
+        if (defaultFuelExpense != null) updates.defaultFuelExpense = Number(defaultFuelExpense) || 0;
+        if (defaultChemicalExpense != null) updates.defaultChemicalExpense = Number(defaultChemicalExpense) || 0;
         if (typeof hasBike === 'boolean') updates.hasBike = hasBike;
         if (fuelAllowance != null) updates.fuelAllowance = Number(fuelAllowance) || 0;
         if (joiningDate) updates.joiningDate = new Date(joiningDate);
@@ -753,7 +762,7 @@ app.post('/api/jobs', auth, async (req, res) => {
         }
 
         if (Array.isArray(assignedStaff) && assignedStaff.length > 0) {
-            jobData.assignedStaff = assignedStaff;
+            jobData.assignedStaff = [assignedStaff[0]];
         }
 
         if (serviceCharge != null) jobData.serviceCharge = Number(serviceCharge) || 0;
@@ -853,7 +862,50 @@ app.put('/api/jobs/:id', auth, async (req, res) => {
             updates.nextServiceAt = addMonths(now, 6);
         }
 
-        const job = await Job.findByIdAndUpdate(req.params.id, updates, { new: true });
+        let job = await Job.findByIdAndUpdate(req.params.id, updates, { new: true });
+
+        if (status === 'completed' && job && job.assignedStaff && job.assignedStaff.length > 0) {
+            const firstStaffId = job.assignedStaff[0];
+            const staffDoc = await User.findById(firstStaffId).select('defaultFuelExpense defaultChemicalExpense name');
+            const fuel = Number(staffDoc?.defaultFuelExpense) || 0;
+            const chemical = Number(staffDoc?.defaultChemicalExpense) || 0;
+            const totalExpense = fuel + chemical;
+            job = await Job.findByIdAndUpdate(req.params.id, {
+                'jobExpenses.fuelCost': fuel,
+                'jobExpenses.chemicalCost': chemical,
+                'jobExpenses.otherCost': 0,
+                'jobExpenses.totalExpense': totalExpense,
+            }, { new: true });
+
+            const staffName = staffDoc?.name || 'Staff';
+            const expenseDate = job.timeline?.completedAt || new Date();
+            const expensesToCreate = [];
+            if (fuel > 0) {
+                expensesToCreate.push({
+                    date: expenseDate,
+                    amount: fuel,
+                    category: 'Fuel',
+                    purpose: `Fuel for job: ${job.customerName} (${job.address})`,
+                    staffName,
+                    staffId: firstStaffId,
+                    paymentMode: 'Cash',
+                    notes: `Auto from job ${job._id}`,
+                });
+            }
+            if (chemical > 0) {
+                expensesToCreate.push({
+                    date: expenseDate,
+                    amount: chemical,
+                    category: 'Chemical',
+                    purpose: `Chemical for job: ${job.customerName} (${job.address})`,
+                    staffName,
+                    staffId: firstStaffId,
+                    paymentMode: 'Cash',
+                    notes: `Auto from job ${job._id}`,
+                });
+            }
+            if (expensesToCreate.length > 0) await Expense.insertMany(expensesToCreate);
+        }
 
         if (io) io.to(`job_${req.params.id}`).emit('job_updated', job);
 
@@ -863,7 +915,7 @@ app.put('/api/jobs/:id', auth, async (req, res) => {
     }
 });
 
-// --- SAVE JOB EXPENSES (Staff submits after completion) ---
+// --- SAVE JOB EXPENSES (Admin override or staff submit - kept for backward compatibility) ---
 app.post('/api/jobs/:id/expenses', auth, async (req, res) => {
     try {
         const { fuelCost, chemicalCost, otherCost, otherCostNote } = req.body;

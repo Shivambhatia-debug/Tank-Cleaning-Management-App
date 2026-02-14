@@ -140,12 +140,6 @@ export default function JobDetailScreen() {
   const [paymentUpdating, setPaymentUpdating] = useState(false);
 
   // Expense state
-  const [fuelCost, setFuelCost] = useState('');
-  const [chemicalCost, setChemicalCost] = useState('');
-  const [otherCost, setOtherCost] = useState('');
-  const [otherCostNote, setOtherCostNote] = useState('');
-  const [expenseSaving, setExpenseSaving] = useState(false);
-  const [expensesSaved, setExpensesSaved] = useState(false);
 
   useEffect(() => { loadJob(); }, []);
 
@@ -156,15 +150,6 @@ export default function JobDetailScreen() {
       setJob(response.data);
       if (response.data?.staffRemark) setRemark(response.data.staffRemark);
       if (response.data?.paymentMode) setPaymentMode(response.data.paymentMode);
-      // Load existing expenses
-      const exp = response.data?.jobExpenses;
-      if (exp && exp.totalExpense > 0) {
-        setFuelCost(exp.fuelCost > 0 ? String(exp.fuelCost) : '');
-        setChemicalCost(exp.chemicalCost > 0 ? String(exp.chemicalCost) : '');
-        setOtherCost(exp.otherCost > 0 ? String(exp.otherCost) : '');
-        setOtherCostNote(exp.otherCostNote || '');
-        setExpensesSaved(true);
-      }
     } catch (error) {
       console.error('Error loading job:', error);
       Alert.alert('Error', 'Failed to load job details');
@@ -301,26 +286,6 @@ export default function JobDetailScreen() {
       Alert.alert('Error', 'Failed to update payment');
     } finally {
       setPaymentUpdating(false);
-    }
-  };
-
-  const saveJobExpenses = async () => {
-    if (!jobId) return;
-    setExpenseSaving(true);
-    try {
-      await api.post(`/jobs/${jobId}/expenses`, {
-        fuelCost: Number(fuelCost) || 0,
-        chemicalCost: Number(chemicalCost) || 0,
-        otherCost: Number(otherCost) || 0,
-        otherCostNote: otherCostNote.trim(),
-      });
-      setExpensesSaved(true);
-      Alert.alert('Saved', 'Job expenses recorded successfully');
-      loadJob();
-    } catch (err: any) {
-      Alert.alert('Error', err.response?.data?.message || 'Failed to save expenses');
-    } finally {
-      setExpenseSaving(false);
     }
   };
 
@@ -712,89 +677,7 @@ export default function JobDetailScreen() {
         )}
 
         {/* ============================================================ */}
-        {/* STEP 6: JOB EXPENSES (in_progress, fill before completing) */}
-        {/* ============================================================ */}
-        {job.status === 'in_progress' && hasAfter && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>JOB EXPENSES</Text>
-            <Text style={{ fontSize: 12, color: '#64748b', marginBottom: 10, fontFamily: FONT_REGULAR }}>
-              Fill the expenses you incurred for this job before marking complete.
-            </Text>
-
-            <Text style={styles.fieldLabel}>Fuel Cost (₹)</Text>
-            <TextInput
-              style={styles.remarkInput}
-              placeholder="e.g. 150"
-              placeholderTextColor="#9ca3af"
-              keyboardType="numeric"
-              value={fuelCost}
-              onChangeText={setFuelCost}
-            />
-
-            <Text style={[styles.fieldLabel, { marginTop: 8 }]}>Chemical Cost (₹)</Text>
-            <TextInput
-              style={styles.remarkInput}
-              placeholder="e.g. 200"
-              placeholderTextColor="#9ca3af"
-              keyboardType="numeric"
-              value={chemicalCost}
-              onChangeText={setChemicalCost}
-            />
-
-            <Text style={[styles.fieldLabel, { marginTop: 8 }]}>Other Cost (₹)</Text>
-            <TextInput
-              style={styles.remarkInput}
-              placeholder="e.g. 50"
-              placeholderTextColor="#9ca3af"
-              keyboardType="numeric"
-              value={otherCost}
-              onChangeText={setOtherCost}
-            />
-            {Number(otherCost) > 0 && (
-              <>
-                <Text style={[styles.fieldLabel, { marginTop: 8 }]}>Other Cost Note</Text>
-                <TextInput
-                  style={styles.remarkInput}
-                  placeholder="What was this expense for?"
-                  placeholderTextColor="#9ca3af"
-                  value={otherCostNote}
-                  onChangeText={setOtherCostNote}
-                />
-              </>
-            )}
-
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, backgroundColor: '#f8fafc', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
-              <Text style={{ fontSize: 14, fontWeight: '600', color: '#334155', fontFamily: FONT_MEDIUM }}>Total Expense</Text>
-              <Text style={{ fontSize: 16, fontWeight: '700', color: '#dc2626', fontFamily: FONT_MEDIUM }}>
-                ₹{((Number(fuelCost) || 0) + (Number(chemicalCost) || 0) + (Number(otherCost) || 0)).toLocaleString('en-IN')}
-              </Text>
-            </View>
-
-            {!expensesSaved && (
-              <TouchableOpacity
-                style={[styles.payBtn, { marginTop: 12, backgroundColor: '#7c3aed' }]}
-                onPress={saveJobExpenses}
-                disabled={expenseSaving}
-              >
-                {expenseSaving ? <ActivityIndicator color="#fff" /> : (
-                  <>
-                    <Ionicons name="save" size={18} color="#fff" />
-                    <Text style={styles.payBtnText}>Save Expenses</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            )}
-            {expensesSaved && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 }}>
-                <Ionicons name="checkmark-circle" size={16} color="#16a34a" />
-                <Text style={{ fontSize: 13, color: '#16a34a', fontFamily: FONT_MEDIUM }}>Expenses saved</Text>
-              </View>
-            )}
-          </View>
-        )}
-
-        {/* ============================================================ */}
-        {/* STEP 7: COMPLETE JOB BUTTON (in_progress + has after photos) */}
+        {/* COMPLETE JOB BUTTON (in_progress + has after photos) */}
         {/* ============================================================ */}
         {job.status === 'in_progress' && hasAfter && (
           <View style={styles.actionCard}>
@@ -861,9 +744,10 @@ export default function JobDetailScreen() {
               )}
             </View>
 
-            {/* Expense Summary after completion */}
+            {/* Expense Summary after completion (set by admin from staff defaults) */}
             <View style={styles.card}>
               <Text style={styles.cardTitle}>JOB EXPENSES</Text>
+              <Text style={{ fontSize: 11, color: '#64748b', marginBottom: 6, fontFamily: FONT_REGULAR }}>From admin-set defaults for your profile</Text>
               {(job.jobExpenses?.totalExpense || 0) > 0 ? (
                 <>
                   {job.jobExpenses.fuelCost > 0 && (

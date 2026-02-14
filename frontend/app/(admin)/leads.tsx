@@ -65,6 +65,7 @@ type Lead = {
   paymentMode?: string;
   notes?: string;
   nextFollowUpAt?: string;
+  firstJobId?: string;
   discussionLogs?: {
     at: string;
     by: string;
@@ -472,6 +473,7 @@ export default function LeadsScreen() {
       const perJob = Number(firstStaff?.defaultPerJobIncentive ?? firstStaff?.default_per_job_incentive) || 0;
       const incentivePerJob = Math.round(tankCount * perTank + perJob);
 
+      const serviceCharge = selectedLead.finalPrice ?? selectedLead.quotedPrice ?? 0;
       const payload: any = {
         customerName: selectedLead.customerName,
         mobileNumber: selectedLead.mobileNumber,
@@ -480,7 +482,7 @@ export default function LeadsScreen() {
         tankCount,
         serviceType: selectedLead.serviceType || 'Water Tank',
         leadSource: selectedLead.source || 'Lead',
-        serviceCharge: 0,
+        serviceCharge: Number(serviceCharge) || 0,
         incentivePerJob,
         paymentMode: 'pending',
         assignedStaff: selectedJobStaffIds,
@@ -492,9 +494,9 @@ export default function LeadsScreen() {
       payload.longitude = lng;
       payload.targetLatitude = lat;
       payload.targetLongitude = lng;
-      await api.post('/jobs', payload);
+      const jobRes = await api.post('/jobs', payload);
+      const createdJobId = jobRes.data?.jobId || jobRes.data?.job?._id;
 
-      // Auto-update lead: move to Follow-up, set job status to In Progress, schedule 6-month follow-up
       const sixMonthsLater = new Date();
       sixMonthsLater.setMonth(sixMonthsLater.getMonth() + 6);
       try {
@@ -502,6 +504,7 @@ export default function LeadsScreen() {
           status: 'Follow-up',
           jobStatus: 'In Progress',
           nextFollowUpAt: sixMonthsLater.toISOString(),
+          firstJobId: createdJobId,
         });
         // Also add a discussion log about the conversion
         await api.post(`/leads/${selectedLead._id}/logs`, {
@@ -1017,18 +1020,18 @@ export default function LeadsScreen() {
                     <Text style={styles.detailInfoLabel}>Payment</Text>
                     <Text style={[styles.detailInfoValue, { color: detailPaymentStatus === 'Received' ? '#16a34a' : '#f59e0b' }]}>{detailPaymentStatus}</Text>
                   </View>
-                  {(selectedLead as any).quotedPrice != null && (selectedLead as any).quotedPrice !== '' && (
-                    <View style={styles.detailInfoRow}>
-                      <Text style={styles.detailInfoLabel}>Quoted Price</Text>
-                      <Text style={styles.detailInfoValue}>₹{(selectedLead as any).quotedPrice}</Text>
-                    </View>
-                  )}
-                  {(selectedLead as any).finalPrice != null && (selectedLead as any).finalPrice !== '' && (
-                    <View style={styles.detailInfoRow}>
-                      <Text style={styles.detailInfoLabel}>Final Price</Text>
-                      <Text style={[styles.detailInfoValue, { fontWeight: '700', color: '#16a34a' }]}>₹{(selectedLead as any).finalPrice}</Text>
-                    </View>
-                  )}
+                  <View style={styles.detailInfoRow}>
+                    <Text style={styles.detailInfoLabel}>Quoted Price</Text>
+                    <Text style={styles.detailInfoValue}>
+                      {(selectedLead as any).quotedPrice != null && (selectedLead as any).quotedPrice !== '' ? `₹${Number((selectedLead as any).quotedPrice).toLocaleString('en-IN')}` : '—'}
+                    </Text>
+                  </View>
+                  <View style={styles.detailInfoRow}>
+                    <Text style={styles.detailInfoLabel}>Final Price</Text>
+                    <Text style={[styles.detailInfoValue, { fontWeight: '700', color: '#16a34a' }]}>
+                      {(selectedLead as any).finalPrice != null && (selectedLead as any).finalPrice !== '' ? `₹${Number((selectedLead as any).finalPrice).toLocaleString('en-IN')}` : '—'}
+                    </Text>
+                  </View>
                   {selectedLead.nextFollowUpAt && (
                     <View style={styles.detailInfoRow}>
                       <Text style={styles.detailInfoLabel}>Next Follow-up</Text>
@@ -1119,7 +1122,7 @@ export default function LeadsScreen() {
                     )}
                   </TouchableOpacity>
 
-                  <Text style={[styles.labelSmall, { marginTop: 12, marginBottom: 6 }]}>Assign Staff</Text>
+                  <Text style={[styles.labelSmall, { marginTop: 12, marginBottom: 6 }]}>Assign Staff (one only)</Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
                     <View style={{ flexDirection: 'row', gap: 6 }}>
                       {(staff.filter((s) => s.isActive !== false) || []).map((s) => {
@@ -1130,11 +1133,7 @@ export default function LeadsScreen() {
                             key={id}
                             style={[styles.statusPill, active && styles.statusPillActive]}
                             onPress={() => {
-                              if (active) {
-                                setSelectedJobStaffIds(selectedJobStaffIds.filter((x) => x !== id));
-                              } else {
-                                setSelectedJobStaffIds([...selectedJobStaffIds, id]);
-                              }
+                              setSelectedJobStaffIds(active ? [] : [id]);
                             }}
                           >
                             <Text style={[styles.statusPillText, active && styles.statusPillTextActive]}>{s.name}</Text>
@@ -1144,18 +1143,26 @@ export default function LeadsScreen() {
                     </View>
                   </ScrollView>
 
-                  <TouchableOpacity
-                    style={[styles.modalBtn, styles.convertBtn]}
-                    onPress={handleCreateJobFromLead}
-                    disabled={creatingJobFromLead}
-                  >
-                    {creatingJobFromLead ? (
-                      <ActivityIndicator color="#fff" />
-                    ) : (
-                      <Text style={styles.convertBtnText}>✅ Convert to Job</Text>
-                    )}
-                  </TouchableOpacity>
-                  <Text style={{ fontSize: 11, color: '#64748b', marginTop: 6, textAlign: 'center' }}>Lead will move to Follow-up with 6-month reminder</Text>
+                  {(selectedLead as any).firstJobId ? (
+                    <View style={[styles.modalBtn, { backgroundColor: '#e2e8f0', opacity: 0.9 }]}>
+                      <Text style={[styles.convertBtnText, { color: '#64748b' }]}>Job already created from this lead</Text>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={[styles.modalBtn, styles.convertBtn]}
+                      onPress={handleCreateJobFromLead}
+                      disabled={creatingJobFromLead}
+                    >
+                      {creatingJobFromLead ? (
+                        <ActivityIndicator color="#fff" />
+                      ) : (
+                        <Text style={styles.convertBtnText}>✅ Convert to Job</Text>
+                      )}
+                    </TouchableOpacity>
+                  )}
+                  {!(selectedLead as any).firstJobId && (
+                    <Text style={{ fontSize: 11, color: '#64748b', marginTop: 6, textAlign: 'center' }}>Lead will move to Follow-up with 6-month reminder</Text>
+                  )}
                 </View>
 
                 {/* Conversation Log Card */}

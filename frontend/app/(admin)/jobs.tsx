@@ -198,19 +198,9 @@ export default function JobsManagementScreen() {
 
   const toggleStaffSelection = (staffId: string) => {
     const tankCount = Number(newJob.tank_count) || 1;
-    if (newJob.assigned_staff_ids.includes(staffId)) {
-      const nextIds = newJob.assigned_staff_ids.filter((id) => id !== staffId);
-      const incentive = recalcIncentiveFromStaff(nextIds, tankCount);
-      setNewJob({
-        ...newJob,
-        assigned_staff_ids: nextIds,
-        incentive_per_job: incentive,
-      });
-    } else {
-      const nextIds = [...newJob.assigned_staff_ids, staffId];
-      const incentive = recalcIncentiveFromStaff(nextIds, tankCount);
-      setNewJob({ ...newJob, assigned_staff_ids: nextIds, incentive_per_job: incentive });
-    }
+    const nextIds = newJob.assigned_staff_ids.includes(staffId) ? [] : [staffId];
+    const incentive = recalcIncentiveFromStaff(nextIds, tankCount);
+    setNewJob({ ...newJob, assigned_staff_ids: nextIds, incentive_per_job: incentive });
   };
 
   const getStatusColor = (status: string) => {
@@ -650,7 +640,7 @@ export default function JobsManagementScreen() {
                 numberOfLines={2}
               />
 
-              <Text style={styles.label}>Assign Staff * (only active staff)</Text>
+              <Text style={styles.label}>Assign Staff * (one staff per job)</Text>
               {(staff.filter((s) => s.isActive !== false) || []).map((s) => (
                 <TouchableOpacity
                   key={s._id}

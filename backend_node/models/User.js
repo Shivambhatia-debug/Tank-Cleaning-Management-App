@@ -37,6 +37,8 @@ const userSchema = new mongoose.Schema({
     defaultPerJobIncentive: { type: Number },
     hasBike: { type: Boolean, default: false },
     fuelAllowance: { type: Number },
+    defaultFuelExpense: { type: Number, default: 0 },
+    defaultChemicalExpense: { type: Number, default: 0 },
     joiningDate: { type: Date },
     employmentStatus: {
         type: String,
