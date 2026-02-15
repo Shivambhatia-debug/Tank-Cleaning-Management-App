@@ -597,7 +597,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 10,
     fontSize: 14,
-    color: '#111827',
+    color: '#0f172a',
+    backgroundColor: '#ffffff',
     marginBottom: 10,
   },
   textArea: {

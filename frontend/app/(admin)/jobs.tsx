@@ -472,6 +472,7 @@ export default function JobsManagementScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="Enter customer name"
+                placeholderTextColor="#64748b"
                 value={newJob.customer_name}
                 onChangeText={(text) =>
                   setNewJob({ ...newJob, customer_name: text })
@@ -482,6 +483,7 @@ export default function JobsManagementScreen() {
               <TextInput
                 style={[styles.input, styles.textArea]}
                 placeholder="Enter full address"
+                placeholderTextColor="#64748b"
                 value={newJob.address}
                 onChangeText={(text) => setNewJob({ ...newJob, address: text })}
                 multiline
@@ -492,6 +494,7 @@ export default function JobsManagementScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="10 digit number"
+                placeholderTextColor="#64748b"
                 value={newJob.mobile_number}
                 onChangeText={(t) => setNewJob({ ...newJob, mobile_number: t.replace(/\D/g, '').slice(0, 10) })}
                 keyboardType="phone-pad"
@@ -502,6 +505,7 @@ export default function JobsManagementScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="e.g. 26.1775"
+                placeholderTextColor="#64748b"
                 keyboardType="numeric"
                 value={String(newJob.latitude || '')}
                 onChangeText={(text) =>
@@ -516,6 +520,7 @@ export default function JobsManagementScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="e.g. 85.8714"
+                placeholderTextColor="#64748b"
                 keyboardType="numeric"
                 value={String(newJob.longitude || '')}
                 onChangeText={(text) =>
@@ -564,6 +569,7 @@ export default function JobsManagementScreen() {
                   <TextInput
                     style={styles.input}
                     placeholder="1"
+                    placeholderTextColor="#64748b"
                     value={newJob.tank_count ? String(newJob.tank_count) : '1'}
                     keyboardType="numeric"
                     onChangeText={(text) => {
@@ -582,6 +588,7 @@ export default function JobsManagementScreen() {
                   <TextInput
                     style={styles.input}
                     placeholder="₹ Amount"
+                    placeholderTextColor="#64748b"
                     value={newJob.service_charge}
                     onChangeText={(text) => setNewJob({ ...newJob, service_charge: text })}
                     keyboardType="numeric"
@@ -602,6 +609,7 @@ export default function JobsManagementScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="Auto: tanks × per tank + per job"
+                placeholderTextColor="#64748b"
                 value={newJob.incentive_per_job}
                 onChangeText={(text) => setNewJob({ ...newJob, incentive_per_job: text })}
                 keyboardType="numeric"
@@ -657,6 +665,7 @@ export default function JobsManagementScreen() {
               <TextInput
                 style={[styles.input, styles.textArea]}
                 placeholder="Add any special instructions"
+                placeholderTextColor="#64748b"
                 value={newJob.notes}
                 onChangeText={(text) => setNewJob({ ...newJob, notes: text })}
                 multiline
@@ -966,11 +975,12 @@ const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1,
-    borderColor: '#DDD',
+    borderColor: '#e2e8f0',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-    color: '#1a1a1a',
+    color: '#0f172a',
+    backgroundColor: '#ffffff',
     marginBottom: 16,
   },
   textArea: {

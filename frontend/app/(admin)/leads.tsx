@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   TouchableOpacity,
   Modal,
   TextInput,
@@ -638,40 +637,48 @@ export default function LeadsScreen() {
         </TouchableOpacity>
       </View>
 
-      <FlatList
-        data={filteredLeads}
-        keyExtractor={(item) => item._id}
-        renderItem={renderLead}
+      <ScrollView
+        style={{ flex: 1 }}
         contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={true}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
-        ListEmptyComponent={
+      >
+        {filteredLeads.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>No leads yet. Add your first lead.</Text>
           </View>
-        }
-      />
+        ) : (
+          filteredLeads.map((item) => (
+            <View key={item._id}>{renderLead({ item })}</View>
+          ))
+        )}
+      </ScrollView>
 
       {/* Create lead modal */}
       <Modal
         visible={createModalVisible}
         animationType="slide"
         onRequestClose={() => setCreateModalVisible(false)}
+        statusBarTranslucent
       >
-        <SafeAreaView style={styles.fullScreenModal}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setCreateModalVisible(false)} style={styles.modalBackBtn}>
-              <Ionicons name="arrow-back" size={24} color="#0f172a" />
-            </TouchableOpacity>
-            <Text style={styles.modalHeaderTitle}>New Lead</Text>
-            <View style={{ width: 40 }} />
-          </View>
-          <ScrollView
-            style={{ flex: 1 }}
-            contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
-            showsVerticalScrollIndicator={false}
-          >
+        <SafeAreaView style={styles.fullScreenModal} edges={['top']}>
+          <View style={styles.createModalBody}>
+            <View style={styles.modalHeader}>
+              <TouchableOpacity onPress={() => setCreateModalVisible(false)} style={styles.modalBackBtn}>
+                <Ionicons name="arrow-back" size={24} color="#0f172a" />
+              </TouchableOpacity>
+              <Text style={styles.modalHeaderTitle}>New Lead</Text>
+              <View style={{ width: 40 }} />
+            </View>
+            <ScrollView
+              style={styles.createScrollView}
+              contentContainerStyle={styles.createScrollContent}
+              showsVerticalScrollIndicator={true}
+              keyboardShouldPersistTaps="handled"
+              nestedScrollEnabled={true}
+            >
               <Text style={styles.label}>Customer name *</Text>
               <TextInput
                 style={styles.input}
@@ -911,7 +918,8 @@ export default function LeadsScreen() {
                   )}
                 </TouchableOpacity>
               </View>
-          </ScrollView>
+            </ScrollView>
+          </View>
         </SafeAreaView>
       </Modal>
 
@@ -920,23 +928,27 @@ export default function LeadsScreen() {
         visible={detailModalVisible}
         animationType="slide"
         onRequestClose={() => setDetailModalVisible(false)}
+        statusBarTranslucent
       >
-        <SafeAreaView style={[styles.fullScreenModal, { flex: 1 }]}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setDetailModalVisible(false)} style={styles.modalBackBtn}>
-              <Ionicons name="arrow-back" size={24} color="#0f172a" />
-            </TouchableOpacity>
-            <Text style={styles.modalHeaderTitle}>Lead Details</Text>
-            <View style={{ width: 40 }} />
-          </View>
-          {selectedLead ? (
-            <ScrollView
-              style={{ flex: 1 }}
-              contentContainerStyle={{ padding: 16, paddingBottom: 40, flexGrow: 1 }}
-              showsVerticalScrollIndicator={true}
-              bounces={true}
-              nestedScrollEnabled={true}
-            >
+        <SafeAreaView style={styles.fullScreenModal} edges={['top']}>
+          <View style={styles.detailModalBody}>
+            <View style={styles.modalHeader}>
+              <TouchableOpacity onPress={() => setDetailModalVisible(false)} style={styles.modalBackBtn}>
+                <Ionicons name="arrow-back" size={24} color="#0f172a" />
+              </TouchableOpacity>
+              <Text style={styles.modalHeaderTitle}>Lead Details</Text>
+              <View style={{ width: 40 }} />
+            </View>
+            {selectedLead ? (
+              <ScrollView
+                style={styles.detailScrollView}
+                contentContainerStyle={styles.detailScrollContent}
+                showsVerticalScrollIndicator={true}
+                bounces={true}
+                nestedScrollEnabled={true}
+                keyboardShouldPersistTaps="handled"
+                overScrollMode="always"
+              >
                 <View style={styles.detailHeaderRow}>
                   <Text style={styles.detailHeaderName} numberOfLines={1}>{selectedLead.customerName}</Text>
                   <TouchableOpacity
@@ -1282,12 +1294,13 @@ export default function LeadsScreen() {
               <Ionicons name="trash-outline" size={18} color="#dc2626" />
               <Text style={styles.deleteLeadBtnText}>Delete lead</Text>
             </TouchableOpacity>
-          </ScrollView>
-          ) : (
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-              <ActivityIndicator size="large" color="#007AFF" />
-            </View>
-          )}
+              </ScrollView>
+            ) : (
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <ActivityIndicator size="large" color="#007AFF" />
+              </View>
+            )}
+          </View>
         </SafeAreaView>
       </Modal>
     </SafeAreaView>
@@ -1451,7 +1464,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 10,
     fontSize: 14,
-    color: '#111827',
+    color: '#0f172a',
+    backgroundColor: '#ffffff',
     marginBottom: 10,
   },
   textArea: {
@@ -1618,6 +1632,28 @@ const styles = StyleSheet.create({
   fullScreenModal: {
     flex: 1,
     backgroundColor: '#f0f4f8',
+  },
+  createModalBody: {
+    flex: 1,
+  },
+  createScrollView: {
+    flex: 1,
+  },
+  createScrollContent: {
+    padding: 16,
+    paddingBottom: 40,
+    flexGrow: 1,
+  },
+  detailModalBody: {
+    flex: 1,
+  },
+  detailScrollView: {
+    flex: 1,
+  },
+  detailScrollContent: {
+    padding: 16,
+    paddingBottom: 40,
+    flexGrow: 1,
   },
   modalHeader: {
     flexDirection: 'row',

@@ -778,7 +778,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     fontSize: 15,
-    color: '#111827', // dark text so it stays visible in light/dark mode
+    color: '#0f172a',
     backgroundColor: '#ffffff',
     marginBottom: 12,
     fontFamily: FONT_REGULAR,
