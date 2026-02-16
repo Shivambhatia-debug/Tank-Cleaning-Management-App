@@ -75,13 +75,23 @@ export const getApiBaseUrl = (): string => `${getBaseUrl()}/api`;
 
 /**
  * Resolve a photo path to a full URL.
- * - If it's already an absolute URL (blob / S3), return as-is.
- * - If it starts with /uploads/, prepend base URL.
- * - Otherwise treat as a bare filename and prepend base + /uploads/.
+ * - If it's already an absolute URL: for /uploads/ paths we rebuild using this device's getBaseUrl()
+ *   so admin/staff on any device load images from the backend they can reach (fixes localhost on admin).
+ * - External URLs (blob/S3) are returned as-is.
+ * - Relative paths get this device's base + /uploads/.
  */
 export function resolvePhotoUrl(photo: string | null | undefined): string | null {
   if (!photo) return null;
-  if (photo.startsWith('http://') || photo.startsWith('https://')) return photo;
-  if (photo.startsWith('/uploads/')) return `${getBaseUrl()}${photo}`;
-  return `${getBaseUrl()}/uploads/${photo}`;
+  const base = getBaseUrl();
+  if (photo.startsWith('http://') || photo.startsWith('https://')) {
+    try {
+      const url = new URL(photo);
+      if (url.pathname.includes('/uploads/')) return base + url.pathname;
+    } catch {
+      // ignore
+    }
+    return photo;
+  }
+  if (photo.startsWith('/uploads/')) return `${base}${photo}`;
+  return `${base}/uploads/${photo}`;
 }

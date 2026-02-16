@@ -510,16 +510,19 @@ export default function LeadsScreen() {
 
       const sixMonthsLater = new Date();
       sixMonthsLater.setMonth(sixMonthsLater.getMonth() + 6);
+      const alreadyHadJob = !!(selectedLead as any).firstJobId;
       try {
-        await api.put(`/leads/${selectedLead._id}`, {
+        const leadPayload: any = {
           status: 'Follow-up',
           jobStatus: 'In Progress',
           nextFollowUpAt: sixMonthsLater.toISOString(),
-          firstJobId: createdJobId,
-        });
-        // Also add a discussion log about the conversion
+        };
+        if (!alreadyHadJob) leadPayload.firstJobId = createdJobId;
+        await api.put(`/leads/${selectedLead._id}`, leadPayload);
         await api.post(`/leads/${selectedLead._id}/logs`, {
-          notes: `Lead converted to job. Staff assigned. Next service follow-up in 6 months.`,
+          notes: alreadyHadJob
+            ? `Another job created from this lead. Next service follow-up in 6 months.`
+            : `Lead converted to job. Staff assigned. Next service follow-up in 6 months.`,
           nextFollowUpAt: sixMonthsLater.toISOString(),
         });
       } catch (updateErr) {
@@ -529,7 +532,7 @@ export default function LeadsScreen() {
       setDetailModalVisible(false);
       setSelectedLead(null);
       loadLeads();
-      Alert.alert('Done', 'Job created! Lead moved to Follow-up with 6-month reminder.');
+      Alert.alert('Done', alreadyHadJob ? 'Another job created from this lead.' : 'Job created! Lead moved to Follow-up with 6-month reminder.');
     } catch (err: any) {
       console.error('Create job from lead error', err.response?.data || err.message);
       Alert.alert('Error', err.response?.data?.message || 'Failed to create job from lead');
@@ -1208,26 +1211,24 @@ export default function LeadsScreen() {
                     </View>
                   </ScrollView>
 
-                  {(selectedLead as any).firstJobId ? (
-                    <View style={[styles.modalBtn, { backgroundColor: '#e0f2fe', borderWidth: 1, borderColor: '#7dd3fc' }]}>
-                      <Text style={[styles.convertBtnText, { color: '#0369a1' }]}>Job already created from this lead</Text>
-                    </View>
-                  ) : (
-                    <TouchableOpacity
-                      style={[styles.modalBtn, styles.convertBtn]}
-                      onPress={handleCreateJobFromLead}
-                      disabled={creatingJobFromLead}
-                    >
-                      {creatingJobFromLead ? (
-                        <ActivityIndicator color="#fff" />
-                      ) : (
-                        <Text style={styles.convertBtnText}>✅ Convert to Job</Text>
-                      )}
-                    </TouchableOpacity>
-                  )}
-                  {!(selectedLead as any).firstJobId && (
-                    <Text style={{ fontSize: 11, color: '#64748b', marginTop: 6, textAlign: 'center' }}>Lead will move to Follow-up with 6-month reminder</Text>
-                  )}
+                  <TouchableOpacity
+                    style={[styles.modalBtn, styles.convertBtn]}
+                    onPress={handleCreateJobFromLead}
+                    disabled={creatingJobFromLead}
+                  >
+                    {creatingJobFromLead ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <Text style={styles.convertBtnText}>
+                        {(selectedLead as any).firstJobId ? 'Create Job' : '✅ Convert to Job'}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                  <Text style={{ fontSize: 11, color: '#64748b', marginTop: 6, textAlign: 'center' }}>
+                    {(selectedLead as any).firstJobId
+                      ? 'Create another job from this lead and assign staff.'
+                      : 'Lead will move to Follow-up with 6-month reminder.'}
+                  </Text>
                 </View>
 
                 {/* Conversation Log Card */}

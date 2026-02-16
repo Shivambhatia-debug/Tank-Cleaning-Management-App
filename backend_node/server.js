@@ -938,6 +938,23 @@ app.put('/api/jobs/:id', auth, async (req, res) => {
             if (expensesToCreate.length > 0) await Expense.insertMany(expensesToCreate);
         }
 
+        // When job is completed, update linked lead's conversation log (follow-up)
+        if (status === 'completed' && job) {
+            const linkedLead = await Lead.findOne({ firstJobId: req.params.id });
+            if (linkedLead) {
+                const now = new Date();
+                const nextFollow = addMonths(now, 6);
+                linkedLead.discussionLogs.push({
+                    at: now,
+                    by: 'Admin',
+                    notes: `Job completed on ${now.toLocaleDateString('en-IN')}. Next service follow-up in 6 months.`,
+                    nextFollowUpAt: nextFollow,
+                });
+                linkedLead.nextFollowUpAt = nextFollow;
+                await linkedLead.save();
+            }
+        }
+
         if (io) io.to(`job_${req.params.id}`).emit('job_updated', job);
 
         res.json({ success: true, message: 'Job updated' });
