@@ -139,7 +139,7 @@ export default function StaffJobsScreen() {
           value={item.paymentStatus === 'paid' ? 'Paid' : 'Pending'}
         />
         <Row
-          label="Service charge"
+          label="Final price"
           value={(item.serviceCharge ?? item.service_charge) > 0 ? `₹${Number(item.serviceCharge ?? item.service_charge).toLocaleString('en-IN')}` : 'On request'}
         />
       </View>

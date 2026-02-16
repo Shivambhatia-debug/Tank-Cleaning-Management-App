@@ -7,9 +7,16 @@ import {
   TouchableOpacity,
   ScrollView,
   RefreshControl,
+  Image,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Constants from 'expo-constants';
 import api from '../../utils/api';
+import { getMapboxStaticUrl } from '../../utils/mapboxStatic';
+
+// Maps SDK for Mobile works only in development build (expo prebuild + run), not in Expo Go
+const useMapboxSDK = Constants.appOwnership !== 'expo';
 
 // Haversine distance (meters) between two lat/lng points
 const distanceInMeters = (
@@ -38,6 +45,7 @@ export default function LiveMapScreen() {
   const [refreshing, setRefreshing] = useState(false);
   /** Job list dikhao pehle; ispe click karne par map khulega */
   const [selectedJobForMap, setSelectedJobForMap] = useState<any | null>(null);
+  const [mapImageError, setMapImageError] = useState(false);
 
   const loadJobs = useCallback(async () => {
     try {
@@ -47,8 +55,8 @@ export default function LiveMapScreen() {
       setSelectedJobForMap((prev) => {
         if (!prev) return null;
         const id = prev._id || prev.id;
-        const stillExists = list.some((j: any) => (j._id || j.id) === id);
-        return stillExists ? prev : null;
+        const fresh = list.find((j: any) => (j._id || j.id) === id);
+        return fresh ?? null;
       });
     } catch (e) {
       setJobs([]);
@@ -62,6 +70,68 @@ export default function LiveMapScreen() {
   useEffect(() => {
     loadJobs();
   }, [loadJobs]);
+
+  // Live tracking: poll job list when a job is selected so staff position updates on map
+  useEffect(() => {
+    if (!selectedJobForMap) return;
+    const interval = setInterval(loadJobs, 6000);
+    return () => clearInterval(interval);
+  }, [selectedJobForMap, loadJobs]);
+
+  // Live tracking: Socket.IO for real-time location updates
+  useEffect(() => {
+    if (!selectedJobForMap) return;
+    const jobId = selectedJobForMap._id || selectedJobForMap.id;
+    if (!jobId) return;
+    let socket: any = null;
+    try {
+      const { io } = require('socket.io-client');
+      const baseUrl = (api.defaults.baseURL || '').replace(/\/api\/?$/, '');
+      if (!baseUrl) return;
+      socket = io(baseUrl, { transports: ['websocket', 'polling'] });
+      socket.emit('join_job', jobId);
+      socket.on('location_update', (data: { staffId: string; latitude: number; longitude: number }) => {
+        setSelectedJobForMap((prev: any) => {
+          if (!prev || (prev._id || prev.id) !== jobId) return prev;
+          const staff = Array.isArray(prev.assignedStaff) ? prev.assignedStaff : [];
+          const next = staff.map((s: any) => {
+            const sid = s._id || s.id;
+            if (String(sid) === String(data.staffId))
+              return { ...s, lastLatitude: data.latitude, lastLongitude: data.longitude };
+            return s;
+          });
+          return { ...prev, assignedStaff: next };
+        });
+      });
+    } catch (_) {
+      // Socket not available (e.g. serverless); polling will still update
+    }
+    return () => {
+      if (socket) socket.removeAllListeners(), socket.disconnect();
+    };
+  }, [selectedJobForMap?._id ?? selectedJobForMap?.id]);
+
+  // Derived values for map (must be before any early return so hooks below are unconditional)
+  const job = selectedJobForMap;
+  const jobLat = job ? (job.latitude ?? job.targetLatitude ?? null) : null;
+  const jobLng = job ? (job.longitude ?? job.targetLongitude ?? null) : null;
+  const staffList = job && Array.isArray(job.assignedStaff) ? job.assignedStaff : [];
+  const jobPoint = jobLat != null && jobLng != null ? { lat: jobLat, lng: jobLng } : null;
+  const staffPointsForMap =
+    job &&
+    Array.isArray(job.assignedStaff)
+      ? job.assignedStaff
+          .filter(
+            (s: any) =>
+              s && typeof s === 'object' && s.lastLatitude != null && s.lastLongitude != null
+          )
+          .map((s: any) => ({ lat: s.lastLatitude, lng: s.lastLongitude }))
+      : [];
+  const mapUrl = getMapboxStaticUrl(jobPoint, staffPointsForMap);
+
+  useEffect(() => {
+    setMapImageError(false);
+  }, [mapUrl]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -133,17 +203,15 @@ export default function LiveMapScreen() {
     );
   }
 
-  // Job select hone par: dummy layout + distance (no real map)
-  const job = selectedJobForMap;
-  const jobLat = job.latitude ?? job.targetLatitude ?? null;
-  const jobLng = job.longitude ?? job.targetLongitude ?? null;
-  const staffList = Array.isArray(job.assignedStaff) ? job.assignedStaff : [];
-
-  const rawAddress = String(job.address || '').trim();
+  // Job detail view (job, jobPoint, staffPointsForMap, mapUrl from top)
+  const rawAddress = String(job?.address || '').trim();
   const isPlaceholderAddress = rawAddress.toLowerCase().startsWith('address from lead');
   const displayAddress = isPlaceholderAddress
     ? 'Location from coordinates / map pin'
     : rawAddress;
+
+  const mapWidth = Dimensions.get('window').width;
+  const mapHeight = Math.round(mapWidth * 0.7);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -155,25 +223,87 @@ export default function LiveMapScreen() {
           <Text style={styles.title} numberOfLines={1}>
             {job.customerName || job.customer_name || 'Job'}
           </Text>
-          <Text style={styles.subtitle}>Location on map</Text>
+          <Text style={styles.subtitle}>Live map</Text>
         </View>
         <View style={{ width: 60 }} />
       </View>
 
-      <View style={styles.mapJobDetail}>
-        <Text style={styles.mapJobDetailTitle}>
-          📍 {job.customerName || job.customer_name || 'Job'}
-        </Text>
-        <Text style={styles.mapJobDetailAddress}>{displayAddress}</Text>
-
-        {jobLat != null && jobLng != null && (
-          <Text style={styles.mapJobDetailCoords}>
-            Target coords: {jobLat.toFixed(4)}, {jobLng.toFixed(4)}
+      <ScrollView
+        style={styles.mapScroll}
+        contentContainerStyle={styles.mapScrollContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
+        <View style={styles.mapJobDetail}>
+          <Text style={styles.mapJobDetailTitle}>
+            📍 {job.customerName || job.customer_name || 'Job'}
           </Text>
-        )}
+          <Text style={styles.mapJobDetailAddress}>{displayAddress}</Text>
+
+          {jobLat != null && jobLng != null && (
+            <Text style={styles.mapJobDetailCoords}>
+              Target: {jobLat.toFixed(4)}, {jobLng.toFixed(4)}
+            </Text>
+          )}
+
+          {(useMapboxSDK && jobPoint) || mapUrl ? (
+            <View style={styles.mapWrap}>
+              {useMapboxSDK && jobPoint ? (() => {
+                try {
+                  const MapboxLiveMapView = require('../../components/MapboxLiveMapView').default;
+                  return (
+                    <MapboxLiveMapView
+                      jobPoint={jobPoint}
+                      staffPoints={staffPointsForMap}
+                      width={mapWidth}
+                      height={mapHeight}
+                    />
+                  );
+                } catch {
+                  return mapUrl && !mapImageError ? (
+                    <Image source={{ uri: mapUrl }} style={[styles.mapImage, { width: mapWidth, height: mapHeight }]} resizeMode="cover" onError={() => setMapImageError(true)} />
+                  ) : mapImageError ? (
+                    <View style={[styles.mapPlaceholder, { marginTop: 0, minHeight: mapHeight }]}>
+                      <Text style={styles.mapPlaceholderText}>Map could not load. Pull down to refresh.</Text>
+                    </View>
+                  ) : (
+                    <View style={[styles.mapPlaceholder, { marginTop: 0, minHeight: mapHeight }]}>
+                      <Text style={styles.mapPlaceholderText}>Add EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN to .env</Text>
+                    </View>
+                  );
+                }
+              })() : mapImageError ? (
+                <View style={[styles.mapPlaceholder, { marginTop: 0, minHeight: mapHeight }]}>
+                  <Text style={styles.mapPlaceholderText}>Map could not load. Pull down to refresh or check connection.</Text>
+                </View>
+              ) : mapUrl ? (
+                <Image
+                  source={{ uri: mapUrl }}
+                  style={[styles.mapImage, { width: mapWidth, height: mapHeight }]}
+                  resizeMode="cover"
+                  onError={() => setMapImageError(true)}
+                />
+              ) : null}
+              <View style={styles.mapLegend}>
+                <Text style={styles.mapLegendText}>🔴 Job</Text>
+                <Text style={styles.mapLegendText}>🟢 Staff</Text>
+                <Text style={[styles.mapLegendText, styles.mapLegendDistance]}>⬛ Distance (staff ↔ job)</Text>
+                {!useMapboxSDK && (
+                  <Text style={styles.mapLegendHint}>Tip: Run expo prebuild then expo run:android for live Maps SDK</Text>
+                )}
+              </View>
+            </View>
+          ) : (
+            <View style={styles.mapPlaceholder}>
+              <Text style={styles.mapPlaceholderText}>
+                {jobPoint
+                  ? 'Add EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN to .env for map'
+                  : 'Job has no coordinates — set lat/lng to see map'}
+              </Text>
+            </View>
+          )}
 
         <View style={styles.trackingBox}>
-          <Text style={styles.trackingTitle}>Live distance (dummy map)</Text>
+          <Text style={styles.trackingTitle}>Live distance</Text>
           {staffList.length === 0 && (
             <Text style={styles.trackingSub}>
               No staff assigned or no live location yet.
@@ -239,7 +369,8 @@ export default function LiveMapScreen() {
             );
           })}
         </View>
-      </View>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -373,6 +504,57 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#888',
     marginBottom: 4,
+  },
+  mapScroll: {
+    flex: 1,
+  },
+  mapScrollContent: {
+    paddingBottom: 24,
+  },
+  mapWrap: {
+    marginTop: 12,
+    overflow: 'hidden',
+    borderRadius: 12,
+    backgroundColor: '#E5E5EA',
+  },
+  mapImage: {
+    backgroundColor: '#E5E5EA',
+  },
+  mapLegend: {
+    flexDirection: 'row',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5EA',
+  },
+  mapLegendText: {
+    fontSize: 12,
+    color: '#666',
+    marginRight: 16,
+  },
+  mapLegendDistance: {
+    color: '#1a1a1a',
+    fontWeight: '600',
+  },
+  mapLegendHint: {
+    fontSize: 10,
+    color: '#999',
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
+  mapPlaceholder: {
+    marginTop: 12,
+    paddingVertical: 24,
+    paddingHorizontal: 16,
+    backgroundColor: '#F0F0F0',
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  mapPlaceholderText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
   },
   mapJobDetailStaff: {
     fontSize: 13,

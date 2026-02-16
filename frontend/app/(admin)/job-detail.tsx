@@ -12,6 +12,7 @@ import {
   Modal,
   Linking,
   Dimensions,
+  Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -67,7 +68,15 @@ function formatPhotoMeta(meta: { at?: string | Date; latitude?: number; longitud
   return { dateTime, location };
 }
 
-function PhotoThumb({ uri, meta }: { uri: string | null; meta?: { at?: string | Date; latitude?: number; longitude?: number } | null }) {
+function PhotoThumb({
+  uri,
+  meta,
+  onShare,
+}: {
+  uri: string | null;
+  meta?: { at?: string | Date; latitude?: number; longitude?: number } | null;
+  onShare?: (url: string) => void;
+}) {
   const [error, setError] = useState(false);
   const { dateTime, location } = formatPhotoMeta(meta || null);
   const hasOverlay = !!(dateTime || location);
@@ -94,6 +103,15 @@ function PhotoThumb({ uri, meta }: { uri: string | null; meta?: { at?: string | 
           {location ? <Text style={styles.photoOverlayText} numberOfLines={1}>📍 {location}</Text> : null}
         </View>
       )}
+      {onShare ? (
+        <TouchableOpacity
+          style={styles.photoShareBtn}
+          onPress={() => onShare(uri)}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="logo-whatsapp" size={22} color="#fff" />
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }
@@ -127,6 +145,25 @@ export default function AdminJobDetailScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSharePhoto = async (url: string) => {
+    try {
+      await Share.share({
+        url,
+        message: 'Cleaning job photo',
+        title: 'Share photo',
+      });
+    } catch (e: any) {
+      if (e?.message?.includes('cancel') || e?.code === 'ECANCELED') return;
+      Linking.openURL(url).catch(() => {});
+    }
+  };
+
+  const normalizePhotoList = (list: unknown): string[] => {
+    if (!list) return [];
+    const arr = Array.isArray(list) ? list : [list];
+    return arr.map((p: any) => (typeof p === 'string' ? p : p?.path ?? p?.url ?? '')).filter(Boolean);
   };
 
   const handleDelete = () => {
@@ -288,21 +325,44 @@ export default function AdminJobDetailScreen() {
               </View>
             </View>
           </View>
-          {job.timeline?.startedAt && (
-            <Text style={{ fontSize: 11, color: '#64748b', marginTop: 8, fontFamily: FONT_REGULAR }}>
-              On the Way: {new Date(job.timeline.startedAt).toLocaleString()}
-            </Text>
-          )}
-          {job.timeline?.arrivedAt && (
-            <Text style={{ fontSize: 11, color: '#0EA5E9', marginTop: 2, fontFamily: FONT_REGULAR }}>
-              Arrived (Before Photo): {new Date(job.timeline.arrivedAt).toLocaleString()}
-            </Text>
-          )}
-          {job.timeline?.completedAt && (
-            <Text style={{ fontSize: 11, color: '#16a34a', marginTop: 2, fontFamily: FONT_REGULAR }}>
-              Completed: {new Date(job.timeline.completedAt).toLocaleString()}
-            </Text>
-          )}
+        </View>
+
+        {/* -------- Job Timeline (Staff activity timings for admin) -------- */}
+        <SectionTitle title="Job Timeline" />
+        <View style={styles.card}>
+          <View style={styles.timelineRow}>
+            <Ionicons name="car-outline" size={18} color="#f59e0b" />
+            <View style={{ flex: 1, marginLeft: 10 }}>
+              <Text style={styles.timelineLabel}>Started (On the way)</Text>
+              <Text style={[styles.timelineValue, { color: '#b45309' }]}>
+                {job.timeline?.startedAt
+                  ? new Date(job.timeline.startedAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
+                  : '—'}
+              </Text>
+            </View>
+          </View>
+          <View style={[styles.timelineRow, { marginTop: 12 }]}>
+            <Ionicons name="location-outline" size={18} color="#0EA5E9" />
+            <View style={{ flex: 1, marginLeft: 10 }}>
+              <Text style={styles.timelineLabel}>Arrived at location</Text>
+              <Text style={[styles.timelineValue, { color: '#0284c7' }]}>
+                {job.timeline?.arrivedAt
+                  ? new Date(job.timeline.arrivedAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
+                  : '—'}
+              </Text>
+            </View>
+          </View>
+          <View style={[styles.timelineRow, { marginTop: 12 }]}>
+            <Ionicons name="checkmark-done-outline" size={18} color="#16a34a" />
+            <View style={{ flex: 1, marginLeft: 10 }}>
+              <Text style={styles.timelineLabel}>Job completed</Text>
+              <Text style={[styles.timelineValue, { color: '#15803d' }]}>
+                {job.timeline?.completedAt
+                  ? new Date(job.timeline.completedAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
+                  : '—'}
+              </Text>
+            </View>
+          </View>
         </View>
 
         {/* -------- Customer Info -------- */}
@@ -331,7 +391,7 @@ export default function AdminJobDetailScreen() {
         <View style={styles.card}>
           <InfoRow label="Payment Status" value={paymentStatus} icon="💳" />
           <InfoRow
-            label="Service Charge"
+            label="Final Price"
             value={charge > 0 ? `₹${charge.toLocaleString('en-IN')}` : 'On request'}
             icon="💰"
           />
@@ -389,11 +449,11 @@ export default function AdminJobDetailScreen() {
         <View style={styles.card}>
           {hasBefore ? (
             <View style={styles.photoGridWrap}>
-              {(job.photos.before as string[]).map((p: string, i: number) => {
+              {normalizePhotoList(job.photos?.before).map((p: string, i: number) => {
                 const uri = resolvePhotoUrl(p);
                 return (
                   <TouchableOpacity key={`b-${i}`} onPress={() => uri && setFullscreenPhotoUri(uri)} activeOpacity={0.9}>
-                    <PhotoThumb uri={uri} meta={job.photosBeforeMeta?.[i]} />
+                    <PhotoThumb uri={uri} meta={job.photosBeforeMeta?.[i]} onShare={handleSharePhoto} />
                   </TouchableOpacity>
                 );
               })}
@@ -416,11 +476,11 @@ export default function AdminJobDetailScreen() {
         <View style={styles.card}>
           {hasAfter ? (
             <View style={styles.photoGridWrap}>
-              {(job.photos?.after || []).map((p: string, i: number) => {
+              {normalizePhotoList(job.photos?.after).map((p: string, i: number) => {
                 const uri = resolvePhotoUrl(p);
                 return (
                   <TouchableOpacity key={`a-${i}`} onPress={() => uri && setFullscreenPhotoUri(uri)} activeOpacity={0.9}>
-                    <PhotoThumb uri={uri} meta={job.photosAfterMeta?.[i]} />
+                    <PhotoThumb uri={uri} meta={job.photosAfterMeta?.[i]} onShare={handleSharePhoto} />
                   </TouchableOpacity>
                 );
               })}
@@ -428,7 +488,7 @@ export default function AdminJobDetailScreen() {
                 const uri = resolvePhotoUrl(job.completionPhoto || job.completion_photo);
                 return (
                   <TouchableOpacity onPress={() => uri && setFullscreenPhotoUri(uri)} activeOpacity={0.9}>
-                    <PhotoThumb uri={uri} meta={job.photosAfterMeta?.[0]} />
+                    <PhotoThumb uri={uri} meta={job.photosAfterMeta?.[0]} onShare={handleSharePhoto} />
                   </TouchableOpacity>
                 );
               })()}
@@ -527,6 +587,15 @@ export default function AdminJobDetailScreen() {
               <Ionicons name="download-outline" size={20} color="#fff" />
               <Text style={styles.fullscreenPhotoDownloadText}>Download / Open</Text>
             </TouchableOpacity>
+            {fullscreenPhotoUri ? (
+              <TouchableOpacity
+                style={[styles.fullscreenPhotoDownloadBtn, { backgroundColor: '#25D366', marginLeft: 8 }]}
+                onPress={() => handleSharePhoto(fullscreenPhotoUri)}
+              >
+                <Ionicons name="logo-whatsapp" size={20} color="#fff" />
+                <Text style={styles.fullscreenPhotoDownloadText}>Share</Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
         </View>
       </Modal>
@@ -664,6 +733,22 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
 
+  timelineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  timelineLabel: {
+    fontSize: 12,
+    color: '#64748b',
+    fontFamily: FONT_REGULAR,
+    marginBottom: 2,
+  },
+  timelineValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    fontFamily: FONT_MEDIUM,
+  },
+
   /* Photos */
   photosRow: {
     flexDirection: 'row',
@@ -730,6 +815,22 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#fff',
     fontFamily: FONT_REGULAR,
+  },
+  photoShareBtn: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#25D366',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 3,
   },
   photoPlaceholder: {
     justifyContent: 'center',

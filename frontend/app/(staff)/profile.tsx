@@ -124,15 +124,6 @@ export default function StaffProfileScreen() {
             <View style={styles.divider} />
             <View style={styles.earningsBlock}>
               <View style={styles.earningsRow}>
-                <Text style={styles.earningsLabel}>Total Revenue (from jobs)</Text>
-                <Text style={styles.earningsValue}>{formatCurrency(stats.totalRevenue)}</Text>
-              </View>
-              <View style={styles.earningsRow}>
-                <Text style={styles.earningsLabel}>This Month Revenue</Text>
-                <Text style={styles.earningsValue}>{formatCurrency(stats.monthlyRevenue)}</Text>
-              </View>
-              <View style={styles.divider} />
-              <View style={styles.earningsRow}>
                 <Text style={styles.earningsLabel}>Total Incentive Earned</Text>
                 <Text style={[styles.earningsValue, { color: '#16a34a' }]}>{formatCurrency(stats.totalIncentive)}</Text>
               </View>

@@ -786,11 +786,11 @@ app.post('/api/jobs', auth, async (req, res) => {
         const job = new Job(jobData);
         await job.save();
 
-        // Ek staff ek hi job par: in staff ko doosri sab pending/in_progress jobs se hatao
+        // One staff per job: remove this staff from any other active job
         const staffIds = (job.assignedStaff || []).map(id => id.toString ? id.toString() : id);
         if (staffIds.length > 0) {
             await Job.updateMany(
-                { _id: { $ne: job._id }, status: { $in: ['pending', 'in_progress'] } },
+                { _id: { $ne: job._id }, status: { $in: ['pending', 'on_the_way', 'in_progress'] } },
                 { $pullAll: { assignedStaff: staffIds } }
             );
         }
@@ -824,11 +824,29 @@ app.get('/api/jobs', auth, async (req, res) => {
     }
 });
 
+function toFullPhotoUrl(pathOrUrl, base) {
+    if (!pathOrUrl || typeof pathOrUrl !== 'string') return pathOrUrl;
+    if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) return pathOrUrl;
+    if (!base) return pathOrUrl;
+    return pathOrUrl.startsWith('/') ? base + pathOrUrl : base + '/uploads/' + pathOrUrl;
+}
+
 app.get('/api/jobs/:id', auth, async (req, res) => {
     try {
         const job = await Job.findById(req.params.id).populate('assignedStaff', 'name phone lastLatitude lastLongitude lastLocationTime perTankIncentive defaultPerJobIncentive defaultFuelExpense defaultChemicalExpense');
         if (!job) return res.status(404).json({ message: 'Job not found' });
-        res.json(job);
+        const jobObj = job.toObject ? job.toObject() : job;
+        const baseUrl = process.env.PUBLIC_BASE_URL || process.env.EXPO_PUBLIC_BACKEND_URL || (req.protocol + '://' + req.get('host'));
+        const base = (baseUrl || '').replace(/\/$/, '');
+        if (base && jobObj.photos) {
+            if (Array.isArray(jobObj.photos.before)) jobObj.photos.before = jobObj.photos.before.map(p => toFullPhotoUrl(p, base));
+            if (Array.isArray(jobObj.photos.after)) jobObj.photos.after = jobObj.photos.after.map(p => toFullPhotoUrl(p, base));
+        }
+        if (base && (jobObj.completionPhoto || jobObj.completion_photo)) {
+            jobObj.completionPhoto = toFullPhotoUrl(jobObj.completionPhoto || jobObj.completion_photo, base);
+            if (jobObj.completion_photo) jobObj.completion_photo = jobObj.completionPhoto;
+        }
+        res.json(jobObj);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -857,6 +875,7 @@ app.put('/api/jobs/:id', auth, async (req, res) => {
         if (incentivePerJob != null) updates.incentivePerJob = Number(incentivePerJob) || 0;
         if (scheduledAt) updates.scheduledAt = new Date(scheduledAt);
 
+        // Job timeline for admin: staff start → on the way → arrived → completed
         if (status === 'on_the_way') updates['timeline.startedAt'] = new Date();
         if (status === 'in_progress') updates['timeline.arrivedAt'] = new Date();
         if (status === 'completed') {
@@ -1095,14 +1114,13 @@ app.post('/api/jobs/:id/upload-before', auth, upload.single('photo'), async (req
                 photosBeforeMeta: beforeMeta
             },
             status: 'in_progress',
-            'timeline.arrivedAt': timestamp,
+            'timeline.arrivedAt': timestamp,  // admin: when staff arrived at location
             beforePhotoAt: timestamp,
             beforePhotoLatitude: lat,
             beforePhotoLongitude: lng,
         };
-        // If staff hasn't started yet (still pending), also set startedAt
         if (existingJob.status === 'pending') {
-            updates['timeline.startedAt'] = timestamp;
+            updates['timeline.startedAt'] = timestamp;  // if they uploaded before tapping Start, set startedAt too
         }
         const job = await Job.findByIdAndUpdate(req.params.id, updates, { new: true });
         if (!job) return res.status(404).json({ message: 'Job not found' });

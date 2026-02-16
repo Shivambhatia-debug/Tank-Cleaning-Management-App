@@ -61,6 +61,12 @@
         {
           "cameraPermission": "Allow Tank Cleaning App to access your camera to take before and after photos."
         }
+      ],
+      [
+        "@rnmapbox/maps",
+        {
+          "RNMapboxMapsVersion": "11.16.2"
+        }
       ]
     ],
     "experiments": {

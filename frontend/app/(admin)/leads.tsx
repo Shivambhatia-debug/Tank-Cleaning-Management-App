@@ -11,6 +11,7 @@ import {
   RefreshControl,
   ScrollView,
   Platform,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,6 +23,7 @@ import api from '../../utils/api';
 
 const FONT_REGULAR = Platform.select({ ios: 'Avenir Next', android: 'sans-serif', default: 'System' });
 const FONT_MEDIUM = Platform.select({ ios: 'Avenir Next', android: 'sans-serif-medium', default: 'System' });
+const { height: WINDOW_HEIGHT } = Dimensions.get('window');
 
 const SOURCE_OPTIONS = ['Direct Call', 'WhatsApp', 'Facebook', 'Instagram', 'Google', 'Referral', 'Walk-in', 'JustDial', 'Other'];
 const SERVICE_TYPE_OPTIONS = ['Water Tank', 'Sump Cleaning', 'Overhead Tank', 'Underground Tank', 'RO Tank', 'Aquarium Tank', 'Septic Tank', 'Swimming Pool', 'Other'];
@@ -88,6 +90,7 @@ export default function LeadsScreen() {
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [jobsForLeads, setJobsForLeads] = useState<any[]>([]);
 
   const [creating, setCreating] = useState(false);
   const [newLead, setNewLead] = useState({
@@ -138,14 +141,16 @@ export default function LeadsScreen() {
     try {
       const params: any = {};
       if (filterStatus !== 'All') params.status = filterStatus;
-      const [leadsRes, staffRes, servicesRes] = await Promise.all([
+      const [leadsRes, staffRes, servicesRes, jobsRes] = await Promise.all([
         api.get<Lead[]>('/leads', { params }),
         api.get('/users?role=staff'),
         api.get('/services').catch(() => ({ data: [] })),
+        api.get('/jobs').catch(() => ({ data: [] })),
       ]);
       setLeads(leadsRes.data);
       setStaff(Array.isArray(staffRes.data) ? staffRes.data : []);
       setServices(Array.isArray(servicesRes.data) ? servicesRes.data : []);
+      setJobsForLeads(Array.isArray(jobsRes.data) ? jobsRes.data : []);
     } catch (err: any) {
       console.error('Error loading leads', err.response?.data || err.message);
       Alert.alert('Error', 'Failed to load leads');
@@ -473,6 +478,7 @@ export default function LeadsScreen() {
 
       const tankCount = selectedLead.numberOfTanks ?? 1;
       const firstStaffId = selectedJobStaffIds[0];
+      if (!firstStaffId) return;
       const firstStaff = staff.find((s: any) => s._id === firstStaffId);
       const perTank = Number(firstStaff?.perTankIncentive) || 0;
       const perJob = Number(firstStaff?.defaultPerJobIncentive ?? firstStaff?.default_per_job_incentive) || 0;
@@ -490,7 +496,7 @@ export default function LeadsScreen() {
         serviceCharge: Number(serviceCharge) || 0,
         incentivePerJob,
         paymentMode: 'pending',
-        assignedStaff: selectedJobStaffIds,
+        assignedStaff: [firstStaffId],
         notes: `Job created from lead ${selectedLead._id}`,
       };
       const lat = latFromLead ?? DEFAULT_LAT;
@@ -662,8 +668,9 @@ export default function LeadsScreen() {
         animationType="slide"
         onRequestClose={() => setCreateModalVisible(false)}
         statusBarTranslucent
+        style={{ margin: 0 }}
       >
-        <SafeAreaView style={styles.fullScreenModal} edges={['top']}>
+        <SafeAreaView style={[styles.fullScreenModal, { minHeight: WINDOW_HEIGHT }]} edges={['top']}>
           <View style={styles.createModalBody}>
             <View style={styles.modalHeader}>
               <TouchableOpacity onPress={() => setCreateModalVisible(false)} style={styles.modalBackBtn}>
@@ -929,8 +936,9 @@ export default function LeadsScreen() {
         animationType="slide"
         onRequestClose={() => setDetailModalVisible(false)}
         statusBarTranslucent
+        style={{ margin: 0 }}
       >
-        <SafeAreaView style={styles.fullScreenModal} edges={['top']}>
+        <SafeAreaView style={[styles.fullScreenModal, { minHeight: WINDOW_HEIGHT }]} edges={['top']}>
           <View style={styles.detailModalBody}>
             <View style={styles.modalHeader}>
               <TouchableOpacity onPress={() => setDetailModalVisible(false)} style={styles.modalBackBtn}>
@@ -946,8 +954,9 @@ export default function LeadsScreen() {
                 showsVerticalScrollIndicator={true}
                 bounces={true}
                 nestedScrollEnabled={true}
-                keyboardShouldPersistTaps="handled"
+                keyboardShouldPersistTaps="always"
                 overScrollMode="always"
+                keyboardDismissMode="on-drag"
               >
                 <View style={styles.detailHeaderRow}>
                   <Text style={styles.detailHeaderName} numberOfLines={1}>{selectedLead.customerName}</Text>
@@ -1161,30 +1170,47 @@ export default function LeadsScreen() {
                     )}
                   </TouchableOpacity>
 
-                  <Text style={[styles.labelSmall, { marginTop: 12, marginBottom: 6 }]}>Assign Staff (one only)</Text>
+                  <Text style={[styles.labelSmall, { marginTop: 12, marginBottom: 6 }]}>Assign Staff (one only) – free staff only</Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
                     <View style={{ flexDirection: 'row', gap: 6 }}>
-                      {(staff.filter((s) => s.isActive !== false) || []).map((s) => {
-                        const id = s._id;
-                        const active = selectedJobStaffIds.includes(id);
-                        return (
-                          <TouchableOpacity
-                            key={id}
-                            style={[styles.statusPill, active && styles.statusPillActive]}
-                            onPress={() => {
-                              setSelectedJobStaffIds(active ? [] : [id]);
-                            }}
-                          >
-                            <Text style={[styles.statusPillText, active && styles.statusPillTextActive]}>{s.name}</Text>
-                          </TouchableOpacity>
+                      {(() => {
+                        const ACTIVE_JOB_STATUSES = ['pending', 'on_the_way', 'in_progress'];
+                        const busyStaffIds = Array.from(
+                          new Set(
+                            (jobsForLeads || [])
+                              .filter((j: any) => ACTIVE_JOB_STATUSES.includes(j.status))
+                              .flatMap((j: any) => (j.assignedStaff || []).map((s: any) => (s && (s._id || s)) ? String(s._id || s) : ''))
+                              .filter(Boolean)
+                          )
                         );
-                      })}
+                        const freeStaff = (staff.filter((s) => s.isActive !== false) || []).filter((s) => !busyStaffIds.includes(s._id));
+                        if (freeStaff.length === 0) {
+                          return (
+                            <Text style={{ color: '#64748b', fontSize: 13 }}>No free staff – all are on another job</Text>
+                          );
+                        }
+                        return freeStaff.map((s) => {
+                          const id = s._id;
+                          const active = selectedJobStaffIds.includes(id);
+                          return (
+                            <TouchableOpacity
+                              key={id}
+                              style={[styles.statusPill, active && styles.statusPillActive]}
+                              onPress={() => {
+                                setSelectedJobStaffIds(active ? [] : [id]);
+                              }}
+                            >
+                              <Text style={[styles.statusPillText, active && styles.statusPillTextActive]}>{s.name}</Text>
+                            </TouchableOpacity>
+                          );
+                        });
+                      })()}
                     </View>
                   </ScrollView>
 
                   {(selectedLead as any).firstJobId ? (
-                    <View style={[styles.modalBtn, { backgroundColor: '#e2e8f0', opacity: 0.9 }]}>
-                      <Text style={[styles.convertBtnText, { color: '#64748b' }]}>Job already created from this lead</Text>
+                    <View style={[styles.modalBtn, { backgroundColor: '#e0f2fe', borderWidth: 1, borderColor: '#7dd3fc' }]}>
+                      <Text style={[styles.convertBtnText, { color: '#0369a1' }]}>Job already created from this lead</Text>
                     </View>
                   ) : (
                     <TouchableOpacity
@@ -1635,9 +1661,11 @@ const styles = StyleSheet.create({
   },
   createModalBody: {
     flex: 1,
+    minHeight: 0,
   },
   createScrollView: {
     flex: 1,
+    minHeight: 0,
   },
   createScrollContent: {
     padding: 16,
@@ -1646,9 +1674,11 @@ const styles = StyleSheet.create({
   },
   detailModalBody: {
     flex: 1,
+    minHeight: 0,
   },
   detailScrollView: {
     flex: 1,
+    minHeight: 0,
   },
   detailScrollContent: {
     padding: 16,

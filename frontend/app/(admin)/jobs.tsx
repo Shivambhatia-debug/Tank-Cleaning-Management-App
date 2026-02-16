@@ -311,7 +311,7 @@ export default function JobsManagementScreen() {
         </View>
         <View style={styles.infoRow}>
           <View style={styles.infoCell}>
-            <Text style={styles.infoCellLabel}>Charge</Text>
+            <Text style={styles.infoCellLabel}>Final Price</Text>
             <Text style={styles.infoCellValue}>{(item.serviceCharge ?? item.service_charge) > 0 ? `₹${Number(item.serviceCharge ?? item.service_charge).toLocaleString('en-IN')}` : 'On request'}</Text>
           </View>
           <View style={styles.infoCell}>
@@ -356,13 +356,13 @@ export default function JobsManagementScreen() {
           </View>
           <View style={styles.photoProgressTimeline}>
             {item.timeline?.startedAt && (
-              <Text style={{ fontSize: 10, color: '#f59e0b' }} numberOfLines={1}>On Way {new Date(item.timeline.startedAt).toLocaleDateString()}</Text>
+              <Text style={{ fontSize: 10, color: '#f59e0b' }} numberOfLines={1}>On way {new Date(item.timeline.startedAt).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}</Text>
             )}
             {item.timeline?.arrivedAt && (
-              <Text style={{ fontSize: 10, color: '#0EA5E9' }} numberOfLines={1}>Arrived {new Date(item.timeline.arrivedAt).toLocaleDateString()}</Text>
+              <Text style={{ fontSize: 10, color: '#0EA5E9' }} numberOfLines={1}>Arrived {new Date(item.timeline.arrivedAt).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}</Text>
             )}
             {item.timeline?.completedAt && (
-              <Text style={{ fontSize: 10, color: '#16a34a' }} numberOfLines={1}>Done {new Date(item.timeline.completedAt).toLocaleDateString()}</Text>
+              <Text style={{ fontSize: 10, color: '#16a34a' }} numberOfLines={1}>Done {new Date(item.timeline.completedAt).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}</Text>
             )}
           </View>
         </View>
@@ -584,7 +584,7 @@ export default function JobsManagementScreen() {
               </View>
               <View style={styles.row}>
                 <View style={styles.col}>
-                  <Text style={styles.label}>Service Charge</Text>
+                  <Text style={styles.label}>Final Price (₹)</Text>
                   <TextInput
                     style={styles.input}
                     placeholder="₹ Amount"

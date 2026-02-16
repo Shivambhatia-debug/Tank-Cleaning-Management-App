@@ -442,7 +442,7 @@ export default function JobDetailScreen() {
         <View style={[styles.card, { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }]}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
             <View>
-              <Text style={{ fontSize: 11, color: '#64748b', fontWeight: '600', letterSpacing: 0.5, fontFamily: FONT_MEDIUM }}>SERVICE CHARGE</Text>
+              <Text style={{ fontSize: 11, color: '#64748b', fontWeight: '600', letterSpacing: 0.5, fontFamily: FONT_MEDIUM }}>FINAL PRICE</Text>
               <Text style={{ fontSize: 18, color: '#0f172a', fontWeight: '700', fontFamily: FONT_MEDIUM }}>
                 ₹{Number(job.serviceCharge || 0).toLocaleString('en-IN')}
               </Text>
@@ -881,7 +881,7 @@ export default function JobDetailScreen() {
                 </View>
               )}
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}>
-                <Text style={{ fontSize: 13, color: '#64748b', fontFamily: FONT_REGULAR }}>Service Charge</Text>
+                <Text style={{ fontSize: 13, color: '#64748b', fontFamily: FONT_REGULAR }}>Final Price</Text>
                 <Text style={{ fontSize: 14, fontWeight: '600', color: '#0f172a', fontFamily: FONT_MEDIUM }}>₹{Number(job.serviceCharge || 0).toLocaleString('en-IN')}</Text>
               </View>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}>
