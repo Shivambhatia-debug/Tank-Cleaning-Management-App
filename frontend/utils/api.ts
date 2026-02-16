@@ -74,24 +74,26 @@ export const getUploadsBaseUrl = (): string => getBaseUrl();
 export const getApiBaseUrl = (): string => `${getBaseUrl()}/api`;
 
 /**
- * Resolve a photo path to a full URL.
- * - If it's already an absolute URL: for /uploads/ paths we rebuild using this device's getBaseUrl()
- *   so admin/staff on any device load images from the backend they can reach (fixes localhost on admin).
- * - External URLs (blob/S3) are returned as-is.
- * - Relative paths get this device's base + /uploads/.
+ * Resolve a photo path to a full URL for loading in Image.
+ * Uses this device's getBaseUrl() so admin/staff on any device load from the backend they can reach.
  */
 export function resolvePhotoUrl(photo: string | null | undefined): string | null {
-  if (!photo) return null;
+  if (!photo || typeof photo !== 'string') return null;
   const base = getBaseUrl();
+  const clean = base.replace(/\/$/, '');
+  // Already full URL (e.g. Vercel Blob): use as-is unless it's our /uploads/ (then rewrite to device base)
   if (photo.startsWith('http://') || photo.startsWith('https://')) {
     try {
       const url = new URL(photo);
-      if (url.pathname.includes('/uploads/')) return base + url.pathname;
+      if (url.pathname.includes('/uploads/')) return `${clean}${url.pathname}`;
     } catch {
       // ignore
     }
     return photo;
   }
-  if (photo.startsWith('/uploads/')) return `${base}${photo}`;
-  return `${base}/uploads/${photo}`;
+  // Normalize path (Windows backslash, duplicate uploads)
+  let path = String(photo).trim().replace(/\\/g, '/');
+  if (path.startsWith('uploads/')) path = path.slice(8);
+  if (path.startsWith('/uploads/')) path = path.slice(9);
+  return `${clean}/uploads/${path}`;
 }

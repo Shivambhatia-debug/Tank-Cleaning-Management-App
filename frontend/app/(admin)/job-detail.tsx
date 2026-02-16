@@ -78,6 +78,9 @@ function PhotoThumb({
   onShare?: (url: string) => void;
 }) {
   const [error, setError] = useState(false);
+  React.useEffect(() => {
+    setError(false);
+  }, [uri]);
   const { dateTime, location } = formatPhotoMeta(meta || null);
   const hasOverlay = !!(dateTime || location);
   if (!uri || error) {
@@ -91,7 +94,8 @@ function PhotoThumb({
   return (
     <View style={styles.photoThumbWrap}>
       <Image
-        source={{ uri }}
+        key={uri}
+        source={{ uri, cache: Platform.OS === 'ios' ? 'reload' : undefined }}
         style={[StyleSheet.absoluteFill, { borderRadius: 10 }]}
         resizeMode="cover"
         onError={() => setError(true)}

@@ -824,28 +824,12 @@ app.get('/api/jobs', auth, async (req, res) => {
     }
 });
 
-function toFullPhotoUrl(pathOrUrl, base) {
-    if (!pathOrUrl || typeof pathOrUrl !== 'string') return pathOrUrl;
-    if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) return pathOrUrl;
-    if (!base) return pathOrUrl;
-    return pathOrUrl.startsWith('/') ? base + pathOrUrl : base + '/uploads/' + pathOrUrl;
-}
-
 app.get('/api/jobs/:id', auth, async (req, res) => {
     try {
         const job = await Job.findById(req.params.id).populate('assignedStaff', 'name phone lastLatitude lastLongitude lastLocationTime perTankIncentive defaultPerJobIncentive defaultFuelExpense defaultChemicalExpense');
         if (!job) return res.status(404).json({ message: 'Job not found' });
         const jobObj = job.toObject ? job.toObject() : job;
-        const baseUrl = process.env.PUBLIC_BASE_URL || process.env.EXPO_PUBLIC_BACKEND_URL || (req.protocol + '://' + req.get('host'));
-        const base = (baseUrl || '').replace(/\/$/, '');
-        if (base && jobObj.photos) {
-            if (Array.isArray(jobObj.photos.before)) jobObj.photos.before = jobObj.photos.before.map(p => toFullPhotoUrl(p, base));
-            if (Array.isArray(jobObj.photos.after)) jobObj.photos.after = jobObj.photos.after.map(p => toFullPhotoUrl(p, base));
-        }
-        if (base && (jobObj.completionPhoto || jobObj.completion_photo)) {
-            jobObj.completionPhoto = toFullPhotoUrl(jobObj.completionPhoto || jobObj.completion_photo, base);
-            if (jobObj.completion_photo) jobObj.completion_photo = jobObj.completionPhoto;
-        }
+        // Send photo paths as-is (no server base URL). Client builds full URL with its own base so admin/staff on any device can load images.
         res.json(jobObj);
     } catch (err) {
         res.status(500).json({ message: err.message });
