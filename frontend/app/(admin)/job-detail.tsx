@@ -88,6 +88,14 @@ function PhotoThumb({
       <View style={[styles.photoThumb, styles.photoPlaceholder]}>
         <Ionicons name="image-outline" size={22} color="#cbd5e1" />
         <Text style={styles.photoPlaceholderText}>N/A</Text>
+        {error && uri ? (
+          <TouchableOpacity
+            onPress={() => Linking.openURL(uri)}
+            style={{ marginTop: 6, paddingVertical: 4, paddingHorizontal: 8, backgroundColor: '#e2e8f0', borderRadius: 6 }}
+          >
+            <Text style={{ fontSize: 11, color: '#475569' }}>Open in browser</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
     );
   }
@@ -95,7 +103,7 @@ function PhotoThumb({
     <View style={styles.photoThumbWrap}>
       <Image
         key={uri}
-        source={{ uri, cache: Platform.OS === 'ios' ? 'reload' : undefined }}
+        source={{ uri, cache: (uri.startsWith('https') ? 'reload' : undefined) as any }}
         style={[StyleSheet.absoluteFill, { borderRadius: 10 }]}
         resizeMode="cover"
         onError={() => setError(true)}

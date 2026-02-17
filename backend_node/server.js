@@ -829,7 +829,12 @@ app.get('/api/jobs/:id', auth, async (req, res) => {
         const job = await Job.findById(req.params.id).populate('assignedStaff', 'name phone lastLatitude lastLongitude lastLocationTime perTankIncentive defaultPerJobIncentive defaultFuelExpense defaultChemicalExpense');
         if (!job) return res.status(404).json({ message: 'Job not found' });
         const jobObj = job.toObject ? job.toObject() : job;
-        // Send photo paths as-is (no server base URL). Client builds full URL with its own base so admin/staff on any device can load images.
+        // Ensure photos always have before/after arrays so admin UI can render (paths as-is; client builds full URL).
+        if (!jobObj.photos || typeof jobObj.photos !== 'object') {
+            jobObj.photos = { before: [], after: [] };
+        }
+        if (!Array.isArray(jobObj.photos.before)) jobObj.photos.before = [];
+        if (!Array.isArray(jobObj.photos.after)) jobObj.photos.after = [];
         res.json(jobObj);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -1230,6 +1235,7 @@ app.get('/api/health', async (req, res) => {
         dbConnected: dbReady,
         hasJwtSecret: !!process.env.JWT_SECRET,
         hasMongoUri: !!process.env.MONGO_URI,
+        blobConfigured: !!(process.env.BLOB_READ_WRITE_TOKEN && blobPut),
         ...(dbReady ? {} : { hint: 'Fix: Atlas Network Access → Add 0.0.0.0/0, and ensure MONGO_URI is correct in Vercel env.' })
     });
 });

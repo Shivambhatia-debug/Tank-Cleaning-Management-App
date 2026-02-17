@@ -74,25 +74,36 @@ export const getUploadsBaseUrl = (): string => getBaseUrl();
 export const getApiBaseUrl = (): string => `${getBaseUrl()}/api`;
 
 /**
+ * Base URL for /uploads/ - must match the backend that serves the job API.
+ * Uses the same base as the axios instance so image requests go to the same origin.
+ */
+function getUploadsBase(): string {
+  const apiBase = api.defaults.baseURL || '';
+  const withoutApi = apiBase.replace(/\/api\/?$/, '').replace(/\/$/, '');
+  return withoutApi || getBaseUrl().replace(/\/$/, '');
+}
+
+/**
  * Resolve a photo path to a full URL for loading in Image.
- * Uses this device's getBaseUrl() so admin/staff on any device load from the backend they can reach.
+ * Uses the same backend base as the API so admin/staff always load images from the server they're calling.
  */
 export function resolvePhotoUrl(photo: string | null | undefined): string | null {
   if (!photo || typeof photo !== 'string') return null;
-  const base = getBaseUrl();
-  const clean = base.replace(/\/$/, '');
-  // Already full URL (e.g. Vercel Blob): use as-is unless it's our /uploads/ (then rewrite to device base)
-  if (photo.startsWith('http://') || photo.startsWith('https://')) {
+  const trimmed = String(photo).trim();
+  if (!trimmed) return null;
+  const clean = getUploadsBase();
+  // Already full URL (e.g. Vercel Blob): use as-is
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
     try {
-      const url = new URL(photo);
+      const url = new URL(trimmed);
       if (url.pathname.includes('/uploads/')) return `${clean}${url.pathname}`;
     } catch {
       // ignore
     }
-    return photo;
+    return trimmed;
   }
-  // Normalize path (Windows backslash, duplicate uploads)
-  let path = String(photo).trim().replace(/\\/g, '/');
+  // Relative path: prepend backend base + /uploads/
+  let path = trimmed.replace(/\\/g, '/');
   if (path.startsWith('uploads/')) path = path.slice(8);
   if (path.startsWith('/uploads/')) path = path.slice(9);
   return `${clean}/uploads/${path}`;
